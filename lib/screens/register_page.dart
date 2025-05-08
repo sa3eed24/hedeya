@@ -118,7 +118,15 @@ class _RegisterPageState extends State<RegisterPage> {
         title: const Text('Create Account'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
+      body:Container(
+    decoration: BoxDecoration(
+    gradient: LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Colors.white, Colors.redAccent],
+    ),
+    ),
+    child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
@@ -278,6 +286,7 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ),
+    )
     );
   }
 }//3san a3ml change

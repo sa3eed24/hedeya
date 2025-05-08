@@ -20,14 +20,21 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
+      body:Container(
+        decoration: BoxDecoration(
+        gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Colors.white, Colors.redAccent],
+    ),
+    ),
+    child: Center(
         child: Lottie.asset(
           'assets/animations/gift_animation.json',
           width: 300,
           height: 280,
         ),
       ),
-    );
+    ));
   }
 }

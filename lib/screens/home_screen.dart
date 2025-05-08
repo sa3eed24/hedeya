@@ -15,11 +15,20 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          _buildWishItem(title: 'Smart Watch', isFulfilled: true),
-          _buildWishItem(title: 'Book', isFulfilled: false),
-        ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Colors.redAccent],
+          ),
+        ),
+        child: ListView(
+          children: [
+            _buildWishItem(title: 'Smart Watch', isFulfilled: true),
+            _buildWishItem(title: 'Book', isFulfilled: false),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {},

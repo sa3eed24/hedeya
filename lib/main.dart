@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Color(0xFFD43A2F)),
         ),
       ),
-      initialRoute: '/giftlist',
+      initialRoute: '/splash',
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginPage(),
