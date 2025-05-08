@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "997786734505",
+    "project_id": "hedeya-efe61",
+    "storage_bucket": "hedeya-efe61.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:997786734505:android:826d7dfa84ba604261feb8",
+        "android_client_info": {
+          "package_name": "com.example.hedeya"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCg_WNidk7OvnMvcQB3VCG4A_vlfnYAmAw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
