@@ -11,4 +11,13 @@ class User_model {
     required this.image,
   });
 
+  factory User_model.fromJson(Map<String, dynamic> json) {
+    return User_model(
+      Name: json['Name'],
+      Email: json['Email'],
+      password: json['password'],
+      image: json['image'],
+    );
+  }
+
 }

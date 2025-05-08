@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hedeya/screens/giftlist.dart';
 import 'package:hedeya/screens/home_screen.dart';
 import 'package:hedeya/screens/login_page.dart';
 import 'package:hedeya/screens/register_page.dart';
@@ -36,12 +37,13 @@ class MyApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Color(0xFFD43A2F)),
         ),
       ),
-      initialRoute: '/splash',
+      initialRoute: '/giftlist',
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomePage(),
+        "/giftlist": (context) => const GiftList(),
       },
     );
   }

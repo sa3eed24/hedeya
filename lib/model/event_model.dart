@@ -11,4 +11,13 @@ class event_model{
     required this.status
   });
 
+  factory event_model.fromJson(Map<String, dynamic> json) {
+    return event_model(
+      Name: json['Name'],
+      id: json['id'],
+      category: json['category'],
+      status: json['status'],
+    );
+  }
+
 }
