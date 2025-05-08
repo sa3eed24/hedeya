@@ -33,6 +33,7 @@ dependencies:
   lottie: ^2.7.0
   cupertino_icons: ^1.0.6
   firebase_core: ^2.18.0
+  image_picker: ^0.8.5+3
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -13,6 +15,16 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
   bool _isLoading = false;
+  XFile? _pickedImage;
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? pickedImage = await picker.pickImage(
+        source: ImageSource.gallery);
+    setState(() {
+      _pickedImage = pickedImage;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +52,20 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage: _pickedImage != null ? FileImage(
+                        File(_pickedImage!.path)) : null,
+                    child: _pickedImage == null
+                        ? Icon(Icons.add_photo_alternate, size: 40,
+                        color: Colors.grey[600])
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 20),
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
@@ -66,10 +92,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : () {
+                  onPressed: _isLoading ? null : () async {
                     if (_formKey.currentState!.validate()) {
                       setState(() => _isLoading = true);
                       // TODO: Firebase Auth registration
+                      // TODO: Upload the picked image to Firebase Storage
                       Navigator.pushReplacementNamed(context, '/home');
                     }
                   },
