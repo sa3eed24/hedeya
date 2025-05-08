@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hedeya/screens/addgift.dart';
 import 'package:hedeya/screens/giftlist.dart';
 import 'package:hedeya/screens/home_screen.dart';
 import 'package:hedeya/screens/login_page.dart';
@@ -43,7 +44,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomePage(),
-        "/giftlist": (context) => const GiftList(),
+        '/giftlist': (context) => const GiftList(),
+        '/addgift': (context) => AddGift(),
       },
     );
   }

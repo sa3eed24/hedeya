@@ -1,8 +1,10 @@
+import 'dart:io';
+
 class gift_model {
   final String name;
   final String description;
   final double price;
-  final String image;
+  final File? imageFile;
   final bool status;
   final String pleged_user;
 
@@ -10,7 +12,7 @@ class gift_model {
     required this.name,
     required this.description,
     required this.price,
-    required this.image,
+    this.imageFile,
     required this.status,
     required this.pleged_user,
   });
@@ -20,10 +22,9 @@ class gift_model {
       name: json['name'],
       description: json['description'],
       price: json['price'],
-      image: json['image'],
+      imageFile: json['imageFile'] != null ? File(json['imageFile']) : null,
       status: json['status'],
       pleged_user: json['pleged_user'],
     );
   }
-
 }
