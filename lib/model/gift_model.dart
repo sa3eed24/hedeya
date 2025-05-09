@@ -21,13 +21,27 @@ class gift_model {
 
   factory gift_model.fromJson(Map<String, dynamic> json) {
     return gift_model(
-      name: json['name'],
-      description: json['description'],
-      price: json['price'],
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+      price: json['price'] is int
+          ? (json['price'] as int).toDouble()
+          : (json['price'] ?? 0.0),
       imageFile: json['imageFile'] != null ? File(json['imageFile']) : null,
-      status: json['status'],
-      pleged_user: json['pleged_user'],
-      eventid: json['eventid'],
+      status: json['status'] ?? false,
+      pleged_user: json['pleged_user'] ?? '',
+      eventid: json['eventid'] ?? 0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'description': description,
+      'price': price,
+      'imageFile': imageFile?.path,
+      'status': status,
+      'pleged_user': pleged_user,
+      'eventid': eventid,
+    };
   }
 }
