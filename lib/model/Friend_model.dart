@@ -1,18 +1,35 @@
-// lib/model/friend_model.dart
 class Friend {
-  final String id;
   final String name;
-  final String profilePictureUrl;
+  final String phoneNumber;
+  final String email;
   final int upcomingEvents;
+  final String? profilePictureUrl; // Optional now, for backward compatibility
 
-  Friend({required this.id, required this.name, required this.profilePictureUrl, this.upcomingEvents = 0});
+  Friend({
+    required this.name,
+    required this.phoneNumber,
+    required this.email,
+    required this.upcomingEvents,
+    this.profilePictureUrl,
+  });
 
   factory Friend.fromMap(Map<String, dynamic> map) {
     return Friend(
-      id: map['id'],
-      name: map['name'],
-      profilePictureUrl: map['profilePictureUrl'],
+      name: map['name'] ?? '',
+      phoneNumber: map['phoneNumber'] ?? '',
+      email: map['email'] ?? '',
       upcomingEvents: map['upcomingEvents'] ?? 0,
+      profilePictureUrl: map['profilePictureUrl'],
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'phoneNumber': phoneNumber,
+      'email': email,
+      'upcomingEvents': upcomingEvents,
+      'profilePictureUrl': profilePictureUrl,
+    };
   }
 }

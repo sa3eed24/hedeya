@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // Add this import
-
-import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AddFriendScreen extends StatefulWidget {
   const AddFriendScreen({super.key});
@@ -16,53 +12,117 @@ class AddFriendScreen extends StatefulWidget {
 class _AddFriendScreenState extends State<AddFriendScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
-  File? _profileImage;
-  final picker = ImagePicker();
-  bool _isUploading = false; // Added loading state
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  bool _isUploading = false;
+  String? _errorMessage;
 
-  Future<void> _pickImage() async {
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _profileImage = File(pickedFile.path);
-      });
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _showError(String message) {
+    debugPrint('ERROR: $message');
+    setState(() {
+      _errorMessage = message;
+      _isUploading = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red[700],
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green[700],
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<bool> _checkFirestoreConnection() async {
+    try {
+      // Try to access the friends collection
+      await FirebaseFirestore.instance.collection('friends').limit(1).get();
+      return true;
+    } catch (e) {
+      debugPrint('Firestore connection test failed: ${e.toString()}');
+      return false;
     }
   }
 
-  Future<void> _uploadFriend() async {
+  Future<void> _addFriend() async {
+    // Validate form inputs
     if (!_formKey.currentState!.validate()) return;
-    if (_profileImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a profile image')),
-      );
+
+    setState(() {
+      _isUploading = true;
+      _errorMessage = null;
+    });
+
+    // First check if we can connect to Firestore
+    final firestoreConnected = await _checkFirestoreConnection();
+    if (!firestoreConnected) {
+      _showError('Could not connect to database. Please check your internet connection.');
       return;
     }
 
-    setState(() => _isUploading = true);
-
     try {
-      // Upload image to Firebase Storage
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images/${DateTime.now().millisecondsSinceEpoch}.jpg');
+      // Get current user ID for reference
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        _showError('You must be logged in to add a friend');
+        return;
+      }
 
-      final uploadTask = storageRef.putFile(_profileImage!);
-      final snapshot = await uploadTask.whenComplete(() {});
-      final imageUrl = await snapshot.ref.getDownloadURL();
+      final String userId = currentUser.uid;
+      debugPrint('Current user ID: $userId');
+      debugPrint('Adding friend with name: ${_nameController.text.trim()}');
 
-      // Add friend data to Firestore
-      await FirebaseFirestore.instance.collection('friends').add({
-        'name': _nameController.text,
-        'profilePictureUrl': imageUrl,
+      // Add friend to Firestore
+      final friendDocRef = await FirebaseFirestore.instance.collection('friends').add({
+        'name': _nameController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
+        'email': _emailController.text.trim(),
         'upcomingEvents': 0,
+        'createdBy': userId,
         'createdAt': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
 
-      Navigator.pop(context);
+      debugPrint('Friend document added with ID: ${friendDocRef.id}');
+
+      if (mounted) {
+        _showSuccess('Friend added successfully!');
+        Navigator.pop(context); // Return to previous screen
+      }
+    } on FirebaseAuthException catch (e) {
+      debugPrint('FirebaseAuthException: ${e.code} - ${e.message}');
+      _showError('Authentication error: ${e.message}');
+    } on FirebaseException catch (e) {
+      debugPrint('FirebaseException: ${e.code} - ${e.message}');
+
+      if (e.code == 'permission-denied') {
+        _showError('Permission denied. Check your database rules.');
+      } else if (e.code == 'unavailable') {
+        _showError('Firebase service unavailable. Check your internet connection.');
+      } else {
+        _showError('Firebase error: ${e.message}');
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading friend: ${e.toString()}')),
-      );
+      debugPrint('General error: ${e.toString()}');
+      _showError('Error: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isUploading = false);
@@ -76,46 +136,150 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
       appBar: AppBar(
         title: const Text('Add Friend'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              GestureDetector(
-                onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundImage: _profileImage != null
-                      ? FileImage(_profileImage!)
-                      : const AssetImage('assets/default_profile.png') as ImageProvider,
-                  child: _profileImage == null
-                      ? const Icon(Icons.add_photo_alternate, size: 50)
-                      : null,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (_errorMessage != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red[300]!),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(color: Colors.red[900]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 20),
+
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Friend Name',
+                    hintText: 'Enter your friend\'s name',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  enabled: !_isUploading,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a name';
+                    }
+                    if (value.trim().length < 2) {
+                      return 'Name must be at least 2 characters';
+                    }
+                    return null;
+                  },
                 ),
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Friend Name',
-                  border: OutlineInputBorder(),
+
+                const SizedBox(height: 20),
+
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    hintText: 'Enter your friend\'s phone number',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  enabled: !_isUploading,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a phone number';
+                    }
+                    // Basic phone number validation
+                    if (value.trim().length < 7) {
+                      return 'Please enter a valid phone number';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _isUploading ? null : _uploadFriend,
-                child: _isUploading
-                    ? const CircularProgressIndicator()
-                    : const Text('Add Friend'),
-              ),
-            ],
+
+                const SizedBox(height: 20),
+
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address',
+                    hintText: 'Enter your friend\'s email address',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  enabled: !_isUploading,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter an email address';
+                    }
+                    // Basic email validation
+                    if (!value.contains('@') || !value.contains('.')) {
+                      return 'Please enter a valid email address';
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 30),
+
+                ElevatedButton.icon(
+                  onPressed: _isUploading ? null : _addFriend,
+                  icon: _isUploading
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                      : const Icon(Icons.person_add),
+                  label: Text(
+                    _isUploading ? 'Adding Friend...' : 'Add Friend',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+
+                if (_isUploading)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20.0),
+                    child: Column(
+                      children: [
+                        const LinearProgressIndicator(),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Adding friend... Please wait',
+                          style: TextStyle(color: Colors.blue[700]),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
