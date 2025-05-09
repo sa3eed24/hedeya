@@ -81,7 +81,7 @@ class _PledgedGiftsState extends State<PledgedGifts> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.white, Colors.pinkAccent], // Changed to purple background
+              colors: [Colors.white, Colors.deepPurple], // Changed to purple background
             ),
           ),
           child: SafeArea(

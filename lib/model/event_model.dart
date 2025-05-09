@@ -3,12 +3,16 @@ class event_model{
   final int id;
   final String category;
   final String status;
+  final String owner;
+  final int owner_id;
 
   event_model({
     required this.Name,
     required this.id,
     required this.category,
-    required this.status
+    required this.status,
+    required this.owner,
+    required this.owner_id,
   });
 
   factory event_model.fromJson(Map<String, dynamic> json) {
@@ -17,6 +21,8 @@ class event_model{
       id: json['id'],
       category: json['category'],
       status: json['status'],
+      owner: json['owner'],
+      owner_id: json['owner_id'],
     );
   }
 
