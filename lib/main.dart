@@ -48,8 +48,8 @@ class MyApp extends StatelessWidget {
         '/giftlist': (context) => const GiftList(),
         '/addgift': (context) => AddGift(),
         '/pledgedgifts': (context) => PledgedGifts(
-              gifts: [], // Pass the list of gifts here
-            ),
+          gifts: [], // Pass the list of gifts here
+        ),
       },
     );
   }
