@@ -7,6 +7,7 @@ class gift_model {
   final File? imageFile;
   final bool status;
   final String pleged_user;
+  final int eventid;
 
   gift_model({
     required this.name,
@@ -15,6 +16,7 @@ class gift_model {
     this.imageFile,
     required this.status,
     required this.pleged_user,
+    required this.eventid,
   });
 
   factory gift_model.fromJson(Map<String, dynamic> json) {
@@ -25,6 +27,7 @@ class gift_model {
       imageFile: json['imageFile'] != null ? File(json['imageFile']) : null,
       status: json['status'],
       pleged_user: json['pleged_user'],
+      eventid: json['eventid'],
     );
   }
 }

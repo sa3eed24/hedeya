@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../model/gift_model.dart';
 import '../utils/giftcard.dart';
 import '../screens/addgift.dart';
+import '../screens/pledgedgifts.dart';
 import 'dart:io';
 
 class GiftList extends StatefulWidget {
@@ -12,20 +13,23 @@ class GiftList extends StatefulWidget {
 }
 
 class _GiftListState extends State<GiftList> {
+  int _currentIndex = 0;
   final List<gift_model> _gifts = [
     gift_model(
-      name: 'Wireless Headphones',
-      description: 'Noise cancelling bluetooth headphones',
-      price: 149.99,
-      status: false,
-      pleged_user: '',
+        name: 'Wireless Headphones',
+        description: 'Noise cancelling bluetooth headphones',
+        price: 149.99,
+        status: false,
+        pleged_user: '',
+        eventid: 0
     ),
     gift_model(
-      name: 'Smart Watch',
-      description: 'Fitness tracker with heart rate monitor',
-      price: 199.99,
-      status: true,
-      pleged_user: 'John Doe',
+        name: 'Smart Watch',
+        description: 'Fitness tracker with heart rate monitor',
+        price: 199.99,
+        status: true,
+        pleged_user: 'John Doe',
+        eventid: 0
     ),
   ];
 
@@ -38,6 +42,7 @@ class _GiftListState extends State<GiftList> {
         imageFile: _gifts[index].imageFile,
         status: status,
         pleged_user: status ? 'Current User' : '',
+        eventid: _gifts[index].eventid,
       );
     });
   }
@@ -69,7 +74,7 @@ class _GiftListState extends State<GiftList> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
+            const DrawerHeader(
               decoration: BoxDecoration(
                 color: Colors.redAccent,
               ),
@@ -82,15 +87,15 @@ class _GiftListState extends State<GiftList> {
               ),
             ),
             ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Settings'),
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
               onTap: () => Navigator.pop(context),
             ),
           ],
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -156,24 +161,24 @@ class _GiftListState extends State<GiftList> {
                       background: Container(
                         color: Colors.red,
                         alignment: Alignment.centerRight,
-                        padding: EdgeInsets.only(right: 20),
-                        child: Icon(Icons.delete, color: Colors.white),
+                        padding: const EdgeInsets.only(right: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
                       ),
                       confirmDismiss: (direction) async {
                         if (_gifts[index].status) return false;
                         return await showDialog(
                           context: context,
                           builder: (context) => AlertDialog(
-                            title: Text('Delete Gift'),
+                            title: const Text('Delete Gift'),
                             content: Text('Are you sure you want to delete ${_gifts[index].name}?'),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(false),
-                                child: Text('Cancel'),
+                                child: const Text('Cancel'),
                               ),
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(true),
-                                child: Text('Delete', style: TextStyle(color: Colors.red)),
+                                child: const Text('Delete', style: TextStyle(color: Colors.red)),
                               ),
                             ],
                           ),
@@ -192,12 +197,45 @@ class _GiftListState extends State<GiftList> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PledgedGifts(gifts: _gifts),
+              ),
+            ).then((_) {
+              setState(() {
+                _currentIndex = 0;
+              });
+            });
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.card_giftcard),
+            label: 'All Gifts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.verified_user),
+            label: 'Pledged Gifts',
+          ),
+        ],
+        selectedItemColor: Colors.redAccent,
+        unselectedItemColor: Colors.grey,
+      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
         onPressed: () async {
           final newGift = await Navigator.push<gift_model>(
             context,
             MaterialPageRoute(
-              builder: (context) => AddGift(),
+              builder: (context) => const AddGift(),
             ),
           );
 
@@ -212,7 +250,8 @@ class _GiftListState extends State<GiftList> {
         },
         child: const Icon(Icons.add, color: Colors.red),
         backgroundColor: Colors.white,
-      ),
+      )
+          : null,
     );
   }
 }

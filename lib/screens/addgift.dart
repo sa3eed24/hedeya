@@ -43,6 +43,7 @@ class _AddGiftState extends State<AddGift> {
           imageFile: _selectedImage,
           status: false,
           pleged_user: '',
+          eventid: 0,
         );
 
         Navigator.pop(context, newGift);

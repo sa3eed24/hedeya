@@ -5,6 +5,7 @@ import 'package:hedeya/screens/home_screen.dart';
 import 'package:hedeya/screens/login_page.dart';
 import 'package:hedeya/screens/register_page.dart';
 import 'package:hedeya/screens/splash_screen.dart';
+import 'package:hedeya/screens/pledgedgifts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -46,6 +47,9 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/giftlist': (context) => const GiftList(),
         '/addgift': (context) => AddGift(),
+        '/pledgedgifts': (context) => PledgedGifts(
+              gifts: [], // Pass the list of gifts here
+            ),
       },
     );
   }
