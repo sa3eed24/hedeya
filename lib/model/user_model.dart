@@ -6,7 +6,7 @@ class UserModel {
   final String Email;
   final String password;
   final String image;
-  final List<Friend> friend = [];
+  final List<Friend> friends = [];
   final List<EventModel> events = [];
 
   UserModel({
