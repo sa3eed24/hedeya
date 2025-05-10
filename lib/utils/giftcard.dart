@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../model/gift_model.dart';
 
@@ -34,45 +35,63 @@ class _GiftCardState extends State<GiftCard> {
   }
 
   Widget _buildGiftImage() {
-    if (widget.gift.imageUrl != null && widget.gift.imageUrl!.isNotEmpty) {
-      return Image.network(
-        widget.gift.imageUrl!,
-        width: 60,
-        height: 60,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
-      );
+    if (widget.gift.image != null && widget.gift.image!.isNotEmpty) {
+      // Check if the image is base64 encoded
+      if (widget.gift.image!.startsWith('data:image')) {
+        // Already properly formatted data URI
+        return Image.memory(
+          base64Decode(widget.gift.image!.split(',')[1]),
+          width: 100, // Increased image width
+          height: 100, // Increased image height
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
+        );
+      } else {
+        // Assume it's raw base64 data without data URI prefix
+        // Add data URI prefix if it's missing
+        final dataUri = 'data:image/png;base64,${widget.gift.image!}';
+        return Image.memory(
+          base64Decode(dataUri.split(',')[1]),
+          width: 100, // Increased image width
+          height: 100, // Increased image height
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
+        );
+      }
     }
     return _buildPlaceholderImage();
   }
 
   Widget _buildPlaceholderImage() {
     return Container(
-      width: 60,
-      height: 60,
-      color: Colors.grey[200],
-      child: Icon(Icons.card_giftcard, color: Colors.grey[600]),
+      width: 100, // Increased placeholder width
+      height: 100, // Increased placeholder height
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(12.0), // Increased border radius
+      ),
+      child: Icon(Icons.card_giftcard, size: 40, color: Colors.grey[600]), // Increased icon size
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 4.0),
-      elevation: 2.0,
+      margin: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0), // Increased margins
+      elevation: 4.0, // Increased elevation
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
+        borderRadius: BorderRadius.circular(12.0), // Increased border radius
       ),
       child: Padding(
-        padding: const EdgeInsets.all(10.0),
+        padding: const EdgeInsets.all(16.0), // Increased padding
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
+              borderRadius: BorderRadius.circular(12.0), // Increased border radius
               child: _buildGiftImage(),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 20), // Increased spacing
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,42 +100,42 @@ class _GiftCardState extends State<GiftCard> {
                   Text(
                     widget.gift.name,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 20, // Increased font size
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8), // Increased spacing
                   Text(
                     widget.gift.description,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14, // Increased font size
                       color: Colors.grey[700],
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8), // Increased spacing
                   Text(
                     '\$${widget.gift.price.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 16, // Increased font size
                       color: Colors.green,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (_status && widget.gift.pledgedUser.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8), // Increased spacing
                     Row(
                       children: [
-                        Icon(Icons.person, size: 14, color: Colors.blue[700]),
-                        const SizedBox(width: 4),
+                        Icon(Icons.person, size: 18, color: Colors.blue[700]), // Increased icon size
+                        const SizedBox(width: 8), // Increased spacing
                         Expanded(
                           child: Text(
                             'Pledged by: ${widget.gift.pledgedUser}',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 14, // Increased font size
                               color: Colors.blue[700],
                               fontStyle: FontStyle.italic,
                             ),

@@ -3,7 +3,7 @@ class GiftModel {
   final String name;
   final String description;
   final double price;
-  final String? imageUrl;
+  final String? image;
   final bool status;
   final String pledgedUser;
   final String eventId;
@@ -14,7 +14,7 @@ class GiftModel {
     required this.name,
     required this.description,
     required this.price,
-    this.imageUrl,
+    this.image,
     required this.status,
     required this.pledgedUser,
     required this.eventId,
@@ -29,7 +29,7 @@ class GiftModel {
       price: json['price'] is int
           ? (json['price'] as int).toDouble()
           : (json['price'] ?? 0.0),
-      imageUrl: json['imageUrl'],
+      image: json['imageUrl'],
       status: json['status'] ?? false,
       pledgedUser: json['pledgedUser'] ?? '',
       eventId: json['eventId'] ?? '',
@@ -43,7 +43,7 @@ class GiftModel {
       'name': name,
       'description': description,
       'price': price,
-      'imageUrl': imageUrl,
+      'imageUrl': image,
       'status': status,
       'pledgedUser': pledgedUser,
       'eventId': eventId,
@@ -56,7 +56,7 @@ class GiftModel {
     String? name,
     String? description,
     double? price,
-    String? imageUrl,
+    String? image,
     bool? status,
     String? pledgedUser,
     String? eventId,
@@ -67,7 +67,7 @@ class GiftModel {
       name: name ?? this.name,
       description: description ?? this.description,
       price: price ?? this.price,
-      imageUrl: imageUrl ?? this.imageUrl,
+      image: image ?? this.image,
       status: status ?? this.status,
       pledgedUser: pledgedUser ?? this.pledgedUser,
       eventId: eventId ?? this.eventId,

@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:barcode_scan2/barcode_scan2.dart';
 import 'dart:io';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart'; // Add Firebase Auth import
 import '../model/gift_model.dart';
 
 class AddGift extends StatefulWidget {
   final String eventId;
 
-  const AddGift({super.key, required this.eventId});
+  const AddGift({Key? key, required this.eventId}) : super(key: key);
 
   @override
   State<AddGift> createState() => _AddGiftState();
@@ -22,6 +19,7 @@ class _AddGiftState extends State<AddGift> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   File? _selectedImage;
+  String? _base64Image; // Store the base64 string
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
 
@@ -41,8 +39,12 @@ class _AddGiftState extends State<AddGift> {
       );
 
       if (pickedFile != null) {
+        final imageFile = File(pickedFile.path);
+        final base64String = await _convertImageToBase64(imageFile);
+
         setState(() {
-          _selectedImage = File(pickedFile.path);
+          _selectedImage = imageFile;
+          _base64Image = base64String;
         });
       }
     } catch (e) {
@@ -58,8 +60,12 @@ class _AddGiftState extends State<AddGift> {
       );
 
       if (pickedFile != null) {
+        final imageFile = File(pickedFile.path);
+        final base64String = await _convertImageToBase64(imageFile);
+
         setState(() {
-          _selectedImage = File(pickedFile.path);
+          _selectedImage = imageFile;
+          _base64Image = base64String;
         });
       }
     } catch (e) {
@@ -67,129 +73,22 @@ class _AddGiftState extends State<AddGift> {
     }
   }
 
+  Future<String> _convertImageToBase64(File imageFile) async {
+    try {
+      final bytes = await imageFile.readAsBytes();
+      final base64String = base64Encode(bytes);
+      // Return as data URI and remove whitespace
+      return 'data:image/png;base64,${base64String.replaceAll(RegExp(r'\s'), '')}';
+    } catch (e) {
+      _showErrorSnackBar('Error converting image to base64: ${e.toString()}');
+      rethrow;
+    }
+  }
+
   void _removeImage() {
     setState(() {
       _selectedImage = null;
-    });
-  }
-
-  Future<void> _scanBarcode() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final ScanOptions options = ScanOptions(
-        strings: {
-          'cancel': 'Cancel',
-          'flash_on': 'Flash on',
-          'flash_off': 'Flash off',
-        },
-        restrictFormat: [BarcodeFormat.qr, BarcodeFormat.ean13, BarcodeFormat.ean8, BarcodeFormat.upce, BarcodeFormat.upce],
-        useCamera: -1,
-        android: const AndroidOptions(
-          aspectTolerance: 0.5,
-          useAutoFocus: true,
-        ),
-      );
-
-      final ScanResult result = await BarcodeScanner.scan(options: options);
-
-      if (result.type == ResultType.Barcode && result.rawContent.isNotEmpty) {
-        await _fetchProductDetails(result.rawContent);
-        _showSuccessSnackBar('Barcode scanned: ${result.rawContent}');
-      } else if (result.type == ResultType.Cancelled) {
-        _showErrorSnackBar('Scan cancelled');
-      } else {
-        _showErrorSnackBar('Scan failed or empty result');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Error scanning barcode: ${e.toString()}');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _fetchProductDetails(String barcode) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final response = await http.get(
-        Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcode.json'),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 1) {
-          final product = data['product'];
-          setState(() {
-            _nameController.text = product['product_name'] ??
-                product['generic_name'] ??
-                'Product #${barcode.substring(barcode.length > 4 ? barcode.length - 4 : 0)}';
-
-            List<String> descriptionParts = [];
-            if (product['brands'] != null) descriptionParts.add('Brand: ${product['brands']}');
-            if (product['quantity'] != null) descriptionParts.add('Quantity: ${product['quantity']}');
-            if (product['categories'] != null) descriptionParts.add('Category: ${product['categories']}');
-            if (product['ingredients_text'] != null && product['ingredients_text'].toString().isNotEmpty) {
-              descriptionParts.add('Ingredients: ${product['ingredients_text']}');
-            }
-            if (descriptionParts.isEmpty) {
-              descriptionParts.add('Item with barcode: $barcode');
-            }
-            _descriptionController.text = descriptionParts.join('\n');
-            _priceController.text = '';
-            _downloadProductImage(product);
-          });
-        } else {
-          _setDefaultProductValues(barcode);
-          _showErrorSnackBar('Product details not found for this barcode');
-        }
-      } else {
-        _setDefaultProductValues(barcode);
-        _showErrorSnackBar('Failed to fetch product details');
-      }
-    } catch (e) {
-      _setDefaultProductValues(barcode);
-      _showErrorSnackBar('Error fetching product details: ${e.toString()}');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _downloadProductImage(dynamic product) async {
-    try {
-      String? imageUrl = product['image_url'] ??
-          product['image_front_url'] ??
-          product['image_front_small_url'];
-
-      if (imageUrl != null && imageUrl.isNotEmpty) {
-        final response = await http.get(Uri.parse(imageUrl));
-        if (response.statusCode == 200) {
-          final tempDir = await Directory.systemTemp.createTemp('gift_images');
-          final tempFile = File('${tempDir.path}/product_image.jpg');
-          await tempFile.writeAsBytes(response.bodyBytes);
-          setState(() {
-            _selectedImage = tempFile;
-          });
-        }
-      }
-    } catch (e) {
-      print('Error downloading product image: ${e.toString()}');
-    }
-  }
-
-  void _setDefaultProductValues(String barcode) {
-    setState(() {
-      _nameController.text = 'Product #${barcode.substring(barcode.length > 4 ? barcode.length - 4 : 0)}';
-      _descriptionController.text = 'Item with barcode: $barcode';
-      _priceController.text = '';
+      _base64Image = null;
     });
   }
 
@@ -222,22 +121,16 @@ class _AddGiftState extends State<AddGift> {
           return;
         }
 
-        // Get the current authenticated user's ID
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) {
-          _showErrorSnackBar('User not authenticated');
-          return;
-        }
-
+        // Assuming user authentication and other logic are handled elsewhere
         final newGift = GiftModel(
           name: _nameController.text.trim(),
           description: _descriptionController.text.trim(),
           price: price,
-          imageUrl: _selectedImage?.path,
+          image: _base64Image, // Using the base64 string
           status: false,
           pledgedUser: '',
           eventId: widget.eventId,
-          userId: user.uid, // Add the authenticated user's ID
+          userId: 'some_user_id', // Replace with actual user ID
         );
 
         Navigator.pop(context, newGift);
@@ -309,8 +202,8 @@ class _AddGiftState extends State<AddGift> {
                                   child: _selectedImage != null
                                       ? ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
-                                    child: Image.file(
-                                      _selectedImage!,
+                                    child: Image.memory(
+                                      base64Decode(_base64Image!.split(',')[1]),
                                       width: 200,
                                       height: 200,
                                       fit: BoxFit.cover,
@@ -365,41 +258,22 @@ class _AddGiftState extends State<AddGift> {
                               ],
                             ),
                             const SizedBox(height: 20),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _nameController,
-                                    decoration: InputDecoration(
-                                      labelText: 'Gift Name',
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                    ),
-                                    validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
-                                        return 'Please enter a gift name';
-                                      }
-                                      return null;
-                                    },
-                                  ),
+                            TextFormField(
+                              controller: _nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Gift Name',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                const SizedBox(width: 10),
-                                IconButton(
-                                  icon: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.redAccent,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    padding: const EdgeInsets.all(12),
-                                    child: const Icon(Icons.qr_code_scanner, color: Colors.white),
-                                  ),
-                                  onPressed: _scanBarcode,
-                                  tooltip: 'Scan Barcode',
-                                ),
-                              ],
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a gift name';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -454,8 +328,7 @@ class _AddGiftState extends State<AddGift> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: Colors.redAccent,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 40, vertical: 16),
+                                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
