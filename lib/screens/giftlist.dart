@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import '../model/gift_model.dart';
+import '../model/event_model.dart';
 import '../utils/giftcard.dart';
 import '../screens/addgift.dart';
 import '../screens/pledgedgifts.dart';
+import '../services/giftcardcontrol.dart';
 
 class GiftList extends StatefulWidget {
-  const GiftList({super.key});
+  final String eventId;
+  final String eventName;
+
+  const GiftList({
+    super.key,
+    required this.eventId,
+    required this.eventName,
+  });
 
   @override
   State<GiftList> createState() => _GiftListState();
@@ -13,44 +22,67 @@ class GiftList extends StatefulWidget {
 
 class _GiftListState extends State<GiftList> {
   int _currentIndex = 0;
-  final List<gift_model> _gifts = [
-    gift_model(
-        name: 'Wireless Headphones',
-        description: 'Noise cancelling bluetooth headphones',
-        price: 149.99,
-        status: false,
-        pleged_user: '',
-        eventid: 0
-    ),
-    gift_model(
-        name: 'Smart Watch',
-        description: 'Fitness tracker with heart rate monitor',
-        price: 199.99,
-        status: true,
-        pleged_user: 'John Doe',
-        eventid: 0
-    ),
-  ];
+  List<GiftModel> _gifts = [];
+  bool _isLoading = true;
+  final GiftCardControl _giftController = GiftCardControl();
 
-  void _onGiftStatusChanged(int index, bool status) {
+  @override
+  void initState() {
+    super.initState();
+    _loadEventGifts();
+  }
+
+  Future<void> _loadEventGifts() async {
     setState(() {
-      _gifts[index] = gift_model(
+      _isLoading = true;
+    });
+
+    try {
+      final gifts = await _giftController.getEventGifts(widget.eventId);
+      setState(() {
+        _gifts = gifts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading gifts: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _onGiftStatusChanged(String giftId, int index, bool status) async {
+    // Update locally first for responsive UI
+    setState(() {
+      _gifts[index] = GiftModel(
+        id: _gifts[index].id,
         name: _gifts[index].name,
         description: _gifts[index].description,
         price: _gifts[index].price,
-        imageFile: _gifts[index].imageFile,
+        imageUrl: _gifts[index].imageUrl,
         status: status,
-        pleged_user: status ? 'Current User' : '',
-        eventid: _gifts[index].eventid,
+        pledgedUser: status ? 'Current User' : '',
+        eventId: _gifts[index].eventId,
       );
     });
+
+    // Then update in Firebase
+    await _giftController.updateGiftStatus(
+        giftId,
+        status,
+        status ? 'Current User' : ''
+    );
   }
 
-  void _deleteGift(int index) {
+  void _deleteGift(String giftId, int index) async {
     final deletedGift = _gifts[index];
+
+    // Remove locally first
     setState(() {
       _gifts.removeAt(index);
     });
+
+    // Show undo snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Deleted ${deletedGift.name}'),
@@ -62,8 +94,15 @@ class _GiftListState extends State<GiftList> {
             });
           },
         ),
+        duration: const Duration(seconds: 3),
       ),
     );
+
+    // After snackbar duration, if not undone, delete from Firebase
+    await Future.delayed(const Duration(seconds: 3, milliseconds: 300));
+    if (!_gifts.contains(deletedGift)) {
+      await _giftController.deleteGift(giftId);
+    }
   }
 
   Widget _buildDrawer(BuildContext context) {
@@ -107,7 +146,7 @@ class _GiftListState extends State<GiftList> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.person, color: Colors.white),
+              leading: const Icon(Icons.home, color: Colors.white),
               title: const Text('Home', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
@@ -116,10 +155,10 @@ class _GiftListState extends State<GiftList> {
             ),
             ListTile(
               leading: const Icon(Icons.list, color: Colors.white),
-              title: const Text('My Wishlist', style: TextStyle(color: Colors.white)),
+              title: const Text('My Events', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/giftlist');
+                Navigator.pushNamed(context, '/eventlist');
               },
             ),
             ListTile(
@@ -130,17 +169,6 @@ class _GiftListState extends State<GiftList> {
                 Navigator.pushNamed(context, '/friends');
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.add, color: Colors.white),
-              title: const Text('Add Gift', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const GiftList()),
-                );
-              },
-            ),
           ],
         ),
       ),
@@ -149,46 +177,49 @@ class _GiftListState extends State<GiftList> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        return false;
-      },
-      child: Scaffold(
-        drawer: _buildDrawer(context),
-        appBar: AppBar(
-          title: const Text('Gift Registry'),
-        ),
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.white, Colors.redAccent],
-            ),
+    return Scaffold(
+      drawer: _buildDrawer(context),
+      appBar: AppBar(
+        title: Text(widget.eventName),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Colors.redAccent],
           ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: _gifts.isEmpty
-                      ? Center(
-                    child: Text(
-                      'No gifts added yet\nTap the + button to add one',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[700],
-                      ),
+        ),
+        child: SafeArea(
+          child: _isLoading
+              ? const Center(
+            child: CircularProgressIndicator(),
+          )
+              : Column(
+            children: [
+              Expanded(
+                child: _gifts.isEmpty
+                    ? Center(
+                  child: Text(
+                    'No gifts added to this event yet\nTap the + button to add one',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[700],
                     ),
-                  )
-                      : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  ),
+                )
+                    : RefreshIndicator(
+                  onRefresh: _loadEventGifts,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
                     itemCount: _gifts.length,
                     itemBuilder: (context, index) {
+                      final gift = _gifts[index];
                       return Dismissible(
-                        key: Key(_gifts[index].name + index.toString()),
-                        direction: _gifts[index].status
+                        key: Key(gift.id ?? '${gift.name}_$index'),
+                        direction: gift.status
                             ? DismissDirection.none
                             : DismissDirection.endToStart,
                         background: Container(
@@ -198,94 +229,111 @@ class _GiftListState extends State<GiftList> {
                           child: const Icon(Icons.delete, color: Colors.white),
                         ),
                         confirmDismiss: (direction) async {
-                          if (_gifts[index].status) return false;
+                          if (gift.status) return false;
                           return await showDialog(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: const Text('Delete Gift'),
-                              content: Text('Are you sure you want to delete ${_gifts[index].name}?'),
+                              content: Text(
+                                  'Are you sure you want to delete ${gift.name}?'),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.of(context).pop(false),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.of(context).pop(true),
-                                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  child: const Text('Delete',
+                                      style: TextStyle(color: Colors.red)),
                                 ),
                               ],
                             ),
                           );
                         },
-                        onDismissed: (direction) => _deleteGift(index),
+                        onDismissed: (direction) =>
+                            _deleteGift(gift.id ?? 'temp_$index', index),
                         child: GiftCard(
-                          gift: _gifts[index],
-                          onStatusChanged: (status) => _onGiftStatusChanged(index, status),
+                          gift: gift,
+                          onStatusChanged: (status) =>
+                              _onGiftStatusChanged(gift.id ?? 'temp_$index', index, status),
                         ),
                       );
                     },
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-            if (index == 1) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PledgedGifts(gifts: _gifts),
-                ),
-              ).then((_) {
-                setState(() {
-                  _currentIndex = 0;
-                });
-              });
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.card_giftcard),
-              label: 'All Gifts',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.verified_user),
-              label: 'Pledged Gifts',
-            ),
-          ],
-          selectedItemColor: Colors.redAccent,
-          unselectedItemColor: Colors.grey,
-        ),
-        floatingActionButton: _currentIndex == 0
-            ? FloatingActionButton(
-          onPressed: () async {
-            final newGift = await Navigator.push<gift_model>(
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          if (index == 1) {
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const AddGift(),
+                builder: (context) => PledgedGifts(
+                  gifts: _gifts,
+                  eventId: widget.eventId,
+                  eventName: widget.eventName,
+                ),
               ),
-            );
-
-            if (newGift != null && mounted) {
+            ).then((_) {
               setState(() {
-                _gifts.add(newGift);
+                _currentIndex = 0;
               });
+              _loadEventGifts(); // Refresh gifts when returning from pledged gifts screen
+            });
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.card_giftcard),
+            label: 'All Gifts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.verified_user),
+            label: 'Pledged Gifts',
+          ),
+        ],
+        selectedItemColor: Colors.redAccent,
+        unselectedItemColor: Colors.grey,
+      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+        onPressed: () async {
+          final newGift = await Navigator.push<GiftModel>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddGift(eventId: widget.eventId),
+            ),
+          );
+
+          if (newGift != null && mounted) {
+            final success = await _giftController.addGift(newGift);
+
+            if (success) {
+              _loadEventGifts(); // Refresh the list
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('${newGift.name} added successfully!')),
               );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to add gift. Please try again.')),
+              );
             }
-          },
-          child: const Icon(Icons.add, color: Colors.red),
-          backgroundColor: Colors.white,
-        )
-            : null,
-      ),
+          }
+        },
+        child: const Icon(Icons.add, color: Colors.red),
+        backgroundColor: Colors.white,
+      )
+          : null,
     );
   }
 }

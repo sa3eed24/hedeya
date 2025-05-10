@@ -1,35 +1,36 @@
-import 'dart:io';
-
-class gift_model {
+class GiftModel {
+  final String? id;
   final String name;
   final String description;
   final double price;
-  final File? imageFile;
+  final String? imageUrl;
   final bool status;
-  final String pleged_user;
-  final int eventid;
+  final String pledgedUser;
+  final String eventId;
 
-  gift_model({
+  GiftModel({
+    this.id,
     required this.name,
     required this.description,
     required this.price,
-    this.imageFile,
+    this.imageUrl,
     required this.status,
-    required this.pleged_user,
-    required this.eventid,
+    required this.pledgedUser,
+    required this.eventId,
   });
 
-  factory gift_model.fromJson(Map<String, dynamic> json) {
-    return gift_model(
+  factory GiftModel.fromJson(Map<String, dynamic> json, {String? id}) {
+    return GiftModel(
+      id: id ?? json['id'],
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       price: json['price'] is int
           ? (json['price'] as int).toDouble()
           : (json['price'] ?? 0.0),
-      imageFile: json['imageFile'] != null ? File(json['imageFile']) : null,
+      imageUrl: json['imageUrl'],
       status: json['status'] ?? false,
-      pleged_user: json['pleged_user'] ?? '',
-      eventid: json['eventid'] ?? 0,
+      pledgedUser: json['pledgedUser'] ?? '',
+      eventId: json['eventId'] ?? '',
     );
   }
 
@@ -38,10 +39,10 @@ class gift_model {
       'name': name,
       'description': description,
       'price': price,
-      'imageFile': imageFile?.path,
+      'imageUrl': imageUrl,
       'status': status,
-      'pleged_user': pleged_user,
-      'eventid': eventid,
+      'pledgedUser': pledgedUser,
+      'eventId': eventId,
     };
   }
 }

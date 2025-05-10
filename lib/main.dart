@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hedeya/screens/Event_List.dart';
 import 'package:hedeya/screens/addgift.dart';
 import 'package:hedeya/screens/giftlist.dart';
 import 'package:hedeya/screens/home_screen.dart';
@@ -45,11 +46,19 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomeScreen(),
-        '/giftlist': (context) => const GiftList(),
-        '/addgift': (context) => AddGift(),
-        '/pledgedgifts': (context) => PledgedGifts(
-          gifts: [], // Pass the list of gifts here
+        '/giftlist': (context) => const GiftList(
+          eventId: '',
+          eventName: '',
         ),
+        '/addgift': (context) => AddGift(
+          eventId: '',
+        ),
+        '/pledgedgifts': (context) => PledgedGifts(
+          gifts: [],
+          eventId: '',
+          eventName: '',
+        ),
+        '/eventlist': (context) => const EventsScreen(),
       },
     );
   }

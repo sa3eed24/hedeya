@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../model/gift_model.dart';
-import 'dart:io';
 
 class GiftCard extends StatefulWidget {
-  final gift_model gift;
+  final GiftModel gift;
   final ValueChanged<bool> onStatusChanged;
   final VoidCallback? onDelete;
 
@@ -28,60 +27,63 @@ class _GiftCardState extends State<GiftCard> {
   }
 
   void _toggleStatus(bool? value) {
-    final newStatus = value ?? false;
+    if (value == null) return;
+
     setState(() {
-      _status = newStatus;
+      _status = value;
     });
     widget.onStatusChanged(_status);
   }
 
   Widget _buildGiftImage() {
-    if (widget.gift.imageFile != null) {
-      return Image.file(
-        widget.gift.imageFile!,
+    if (widget.gift.imageUrl != null && widget.gift.imageUrl!.isNotEmpty) {
+      return Image.network(
+        widget.gift.imageUrl!,
         width: 60,
         height: 60,
         fit: BoxFit.cover,
-      );
-    } else {
-      return Container(
-        width: 60,
-        height: 60,
-        color: Colors.grey[200],
-        child: Icon(Icons.card_giftcard, color: Colors.grey[600]),
+        errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
       );
     }
+    return _buildPlaceholderImage();
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      width: 60,
+      height: 60,
+      color: Colors.grey[200],
+      child: Icon(Icons.card_giftcard, color: Colors.grey[600]),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Dismissible(
-      key: Key(widget.gift.name + widget.gift.hashCode.toString()),
+      key: Key(widget.gift.id ?? '${widget.gift.name}_${widget.gift.hashCode}'),
       direction: widget.gift.status ? DismissDirection.none : DismissDirection.endToStart,
       confirmDismiss: (direction) async {
         if (widget.gift.status) return false;
         return await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text('Delete Gift'),
+            title: const Text('Delete Gift'),
             content: Text('Are you sure you want to delete ${widget.gift.name}?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: Text('Cancel'),
+                child: const Text('Cancel'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: Text('Delete', style: TextStyle(color: Colors.red)),
+                child: const Text('Delete', style: TextStyle(color: Colors.red)),
               ),
             ],
           ),
         );
       },
       onDismissed: (direction) {
-        if (widget.onDelete != null) {
-          widget.onDelete!();
-        }
+        widget.onDelete?.call();
       },
       background: ClipRRect(
         borderRadius: BorderRadius.circular(8.0),
@@ -105,14 +107,7 @@ class _GiftCardState extends State<GiftCard> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8.0),
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                  ),
-                  child: _buildGiftImage(),
-                ),
+                child: _buildGiftImage(),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -148,7 +143,7 @@ class _GiftCardState extends State<GiftCard> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    if (_status && widget.gift.pleged_user.isNotEmpty) ...[
+                    if (_status && widget.gift.pledgedUser.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -156,7 +151,7 @@ class _GiftCardState extends State<GiftCard> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              'Pledged by: ${widget.gift.pleged_user}',
+                              'Pledged by: ${widget.gift.pledgedUser}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.blue[700],

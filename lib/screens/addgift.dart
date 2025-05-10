@@ -7,7 +7,9 @@ import 'package:http/http.dart' as http;
 import '../model/gift_model.dart';
 
 class AddGift extends StatefulWidget {
-  const AddGift({super.key});
+  final String eventId;
+
+  const AddGift({super.key, required this.eventId});
 
   @override
   State<AddGift> createState() => _AddGiftState();
@@ -76,7 +78,6 @@ class _AddGiftState extends State<AddGift> {
     });
 
     try {
-      // Configure barcode scanner options
       final ScanOptions options = ScanOptions(
         strings: {
           'cancel': 'Cancel',
@@ -84,19 +85,16 @@ class _AddGiftState extends State<AddGift> {
           'flash_off': 'Flash off',
         },
         restrictFormat: [BarcodeFormat.qr, BarcodeFormat.ean13, BarcodeFormat.ean8, BarcodeFormat.upce, BarcodeFormat.upce],
-        useCamera: -1, // -1 means auto-select
+        useCamera: -1,
         android: const AndroidOptions(
           aspectTolerance: 0.5,
           useAutoFocus: true,
         ),
       );
 
-      // Start the barcode scanner
       final ScanResult result = await BarcodeScanner.scan(options: options);
 
-      // Process result only if it's successful
       if (result.type == ResultType.Barcode && result.rawContent.isNotEmpty) {
-        // Fetch product details from barcode
         await _fetchProductDetails(result.rawContent);
         _showSuccessSnackBar('Barcode scanned: ${result.rawContent}');
       } else if (result.type == ResultType.Cancelled) {
@@ -115,68 +113,46 @@ class _AddGiftState extends State<AddGift> {
 
   Future<void> _fetchProductDetails(String barcode) async {
     try {
-      // Display loading state
       setState(() {
         _isLoading = true;
       });
 
-      // Call the barcode lookup API - using Open Food Facts as an example
-      // You may want to use a different API based on your needs
       final response = await http.get(
         Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcode.json'),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
-        // Check if product was found
         if (data['status'] == 1) {
           final product = data['product'];
-
-          // Populate form fields with product details
           setState(() {
-            // Set product name
             _nameController.text = product['product_name'] ??
                 product['generic_name'] ??
                 'Product #${barcode.substring(barcode.length > 4 ? barcode.length - 4 : 0)}';
 
-            // Set product description - combine various available fields
             List<String> descriptionParts = [];
             if (product['brands'] != null) descriptionParts.add('Brand: ${product['brands']}');
             if (product['quantity'] != null) descriptionParts.add('Quantity: ${product['quantity']}');
             if (product['categories'] != null) descriptionParts.add('Category: ${product['categories']}');
-
-            // Add ingredients if available
             if (product['ingredients_text'] != null && product['ingredients_text'].toString().isNotEmpty) {
               descriptionParts.add('Ingredients: ${product['ingredients_text']}');
             }
-
-            // Fallback if no description details are available
             if (descriptionParts.isEmpty) {
               descriptionParts.add('Item with barcode: $barcode');
             }
-
             _descriptionController.text = descriptionParts.join('\n');
-
-            // Try to set price if available (rarely provided by food databases)
-            // This would typically come from your own database or a retail API
             _priceController.text = '';
-
-            // Download and set product image if available
             _downloadProductImage(product);
           });
         } else {
-          // Product not found, set default values
           _setDefaultProductValues(barcode);
           _showErrorSnackBar('Product details not found for this barcode');
         }
       } else {
-        // API error, set default values
         _setDefaultProductValues(barcode);
         _showErrorSnackBar('Failed to fetch product details');
       }
     } catch (e) {
-      // Error in API call, set default values
       _setDefaultProductValues(barcode);
       _showErrorSnackBar('Error fetching product details: ${e.toString()}');
     } finally {
@@ -188,33 +164,23 @@ class _AddGiftState extends State<AddGift> {
 
   Future<void> _downloadProductImage(dynamic product) async {
     try {
-      // Check for image URLs in different fields
       String? imageUrl = product['image_url'] ??
           product['image_front_url'] ??
           product['image_front_small_url'];
 
       if (imageUrl != null && imageUrl.isNotEmpty) {
-        // Download the image
         final response = await http.get(Uri.parse(imageUrl));
-
         if (response.statusCode == 200) {
-          // Create a temporary file to store the image
           final tempDir = await Directory.systemTemp.createTemp('gift_images');
           final tempFile = File('${tempDir.path}/product_image.jpg');
-
-          // Write the image data to the file
           await tempFile.writeAsBytes(response.bodyBytes);
-
-          // Set the image file
           setState(() {
             _selectedImage = tempFile;
           });
         }
       }
     } catch (e) {
-      // Silently handle image download errors
       print('Error downloading product image: ${e.toString()}');
-      // Don't show an error to the user as this is not critical
     }
   }
 
@@ -223,7 +189,6 @@ class _AddGiftState extends State<AddGift> {
       _nameController.text = 'Product #${barcode.substring(barcode.length > 4 ? barcode.length - 4 : 0)}';
       _descriptionController.text = 'Item with barcode: $barcode';
       _priceController.text = '';
-      // Don't change the image
     });
   }
 
@@ -248,7 +213,6 @@ class _AddGiftState extends State<AddGift> {
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       try {
-        // Parse the price with proper error handling
         double price;
         try {
           price = double.parse(_priceController.text);
@@ -257,14 +221,14 @@ class _AddGiftState extends State<AddGift> {
           return;
         }
 
-        final newGift = gift_model(
+        final newGift = GiftModel(
           name: _nameController.text.trim(),
           description: _descriptionController.text.trim(),
           price: price,
-          imageFile: _selectedImage,
+          imageUrl: _selectedImage?.path,
           status: false,
-          pleged_user: '',  // Using the original property name from your model
-          eventid: 0,  // Default to 0, you may want to pass this as a parameter
+          pledgedUser: '',
+          eventId: widget.eventId,
         );
 
         Navigator.pop(context, newGift);
@@ -367,7 +331,6 @@ class _AddGiftState extends State<AddGift> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            // Image selection buttons
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -500,7 +463,6 @@ class _AddGiftState extends State<AddGift> {
                   ),
                 ],
               ),
-              // Loading overlay
               if (_isLoading)
                 Container(
                   color: Colors.black.withOpacity(0.4),

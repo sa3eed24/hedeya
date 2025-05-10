@@ -1,16 +1,17 @@
 import '../model/gift_model.dart';
 import '../model/user_model.dart';
-class event_model{
-  final String Name;
-  final int id;
+
+class EventModel {
+  final String name;
+  final String id;
   final String category;
   final String status;
   final String owner;
-  List gifts = [];
-  List users = [];
+  final List<GiftModel> gifts;
+  final List<UserModel> users;
 
-  event_model({
-    required this.Name,
+  EventModel({
+    required this.name,
     required this.id,
     required this.category,
     required this.status,
@@ -19,16 +20,33 @@ class event_model{
     required this.users,
   });
 
-  factory event_model.fromJson(Map<String, dynamic> json) {
-    return event_model(
-      Name: json['Name'],
-      id: json['id'],
-      category: json['category'],
-      status: json['status'],
-      owner: json['owner'],
-      gifts: (json['gifts'] as List<dynamic>).map((gift) => gift_model.fromJson(gift)).toList(),
-      users: (json['users'] as List<dynamic>).map((user) => User_model.fromJson(user)).toList(),
+  factory EventModel.fromJson(Map<String, dynamic> json, {String? id}) {
+    return EventModel(
+      name: json['name'] ?? '',
+      id: id ?? json['id'] ?? '',
+      category: json['category'] ?? '',
+      status: json['status'] ?? 'active',
+      owner: json['owner'] ?? '',
+      gifts: (json['gifts'] as List<dynamic>?)
+          ?.map((gift) => GiftModel.fromJson(gift))
+          .toList() ??
+          [],
+      users: (json['users'] as List<dynamic>?)
+          ?.map((user) => UserModel.fromJson(user))
+          .toList() ??
+          [],
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'id': id,
+      'category': category,
+      'status': status,
+      'owner': owner,
+      'gifts': gifts.map((gift) => gift.toJson()).toList(),
+      'users': users.map((user) => user.toJson()).toList(),
+    };
+  }
 }
