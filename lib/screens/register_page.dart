@@ -1,11 +1,10 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'dart:typed_data';
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -26,14 +25,18 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   File? _selectedImage;
-  double? _uploadProgress;
 
   Future<void> _pickImage() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
       if (image != null) {
         final file = File(image.path);
-        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = 5 * 1024 * 1024;
+
         if (await file.length() > maxSize) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -45,6 +48,7 @@ class _RegisterPageState extends State<RegisterPage> {
           }
           return;
         }
+
         setState(() => _selectedImage = file);
       }
     } catch (e) {
@@ -70,28 +74,20 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _uploadProgress = null;
     });
 
     try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
-      }
-
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      String? imageUrl;
-      if (_selectedImage != null) {
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('user_images/${credential.user!.uid}.jpg');
+      String? base64Image;
 
-        final uploadTask = ref.putFile(_selectedImage!);
-        final snapshot = await uploadTask.whenComplete(() {});
-        imageUrl = await snapshot.ref.getDownloadURL();
+      if (_selectedImage != null) {
+        final bytes = await _selectedImage!.readAsBytes();
+        base64Image = base64Encode(bytes);
       }
 
       await FirebaseFirestore.instance
@@ -100,19 +96,19 @@ class _RegisterPageState extends State<RegisterPage> {
           .set({
         'name': _nameController.text.trim(),
         'email': _emailController.text.trim(),
-        'profileImage': imageUrl,
+        'profileImage': base64Image,
         'createdAt': FieldValue.serverTimestamp(),
         'uid': credential.user!.uid,
       });
 
       if (mounted) {
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Please login'),
+            content: Text('Registration successful!'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _getFirebaseAuthErrorMessage(e));
@@ -151,6 +147,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    Uint8List? imageBytes;
+    if (_selectedImage != null) {
+      imageBytes = _selectedImage!.readAsBytesSync();
+    }
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -179,7 +180,6 @@ class _RegisterPageState extends State<RegisterPage> {
             key: _formKey,
             child: Column(
               children: [
-
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -188,8 +188,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey[200],
-                        backgroundImage: _selectedImage != null
-                            ? FileImage(_selectedImage!)
+                        backgroundImage: imageBytes != null
+                            ? MemoryImage(imageBytes)
                             : null,
                         child: _selectedImage == null
                             ? const Icon(Icons.camera_alt,
@@ -197,12 +197,6 @@ class _RegisterPageState extends State<RegisterPage> {
                             : null,
                       ),
                     ),
-                    if (_uploadProgress != null)
-                      CircularProgressIndicator(
-                        value: _uploadProgress,
-                        backgroundColor: Colors.white70,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFD43A2F)),
-                      ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -287,8 +281,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             : Icons.visibility_off,
                         color: const Color(0xFFD43A2F),
                       ),
-                      onPressed: () => setState(() => _obscureConfirmPassword =
-                      !_obscureConfirmPassword),
+                      onPressed: () => setState(() =>
+                      _obscureConfirmPassword = !_obscureConfirmPassword),
                     ),
                   ),
                   validator: (value) {
@@ -357,7 +351,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       onPressed: () => Navigator.pop(context),
                       child: const Text(
                         'Login',
-                        style: TextStyle(fontSize: 18,
+                        style: TextStyle(
+                          fontSize: 18,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),

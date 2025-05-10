@@ -35,11 +35,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _deleteFriend(String friendId) async {
     try {
-      await FirebaseFirestore.instance.collection('friends').doc(friendId).delete();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Friend removed successfully')),
-      );
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final doc = await FirebaseFirestore.instance
+          .collection('friends')
+          .doc(friendId)
+          .get();
+
+      if (doc.exists && doc.data()?['createdBy'] == currentUser.uid) {
+        await doc.reference.delete();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Friend removed successfully')),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You can only remove friends you added')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
