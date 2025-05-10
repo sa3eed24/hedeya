@@ -108,26 +108,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.list, color: Colors.white),
-              title: const Text('My Wishlist', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/giftlist');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.list, color: Colors.white),
               title: const Text('My Events', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/eventlist');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.group, color: Colors.white),
-              title: const Text('Friends', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/friends');
               },
             ),
             ListTile(
@@ -137,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const GiftList(eventId: '' ,eventName: '')),
+                  MaterialPageRoute(builder: (_) => const GiftList(eventId: '', eventName: '')),
                 );
               },
             ),

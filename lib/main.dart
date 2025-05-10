@@ -4,6 +4,7 @@ import 'package:hedeya/screens/addgift.dart';
 import 'package:hedeya/screens/giftlist.dart';
 import 'package:hedeya/screens/home_screen.dart';
 import 'package:hedeya/screens/login_page.dart';
+import 'package:hedeya/screens/profile_screen.dart';
 import 'package:hedeya/screens/register_page.dart';
 import 'package:hedeya/screens/splash_screen.dart';
 import 'package:hedeya/screens/pledgedgifts.dart';
@@ -58,6 +59,7 @@ class MyApp extends StatelessWidget {
           eventName: '',
         ),
         '/eventlist': (context) => const EventsScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }
