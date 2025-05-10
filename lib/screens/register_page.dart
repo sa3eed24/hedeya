@@ -26,19 +26,36 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   File? _selectedImage;
+  double? _uploadProgress;
 
   Future<void> _pickImage() async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+        final file = File(image.path);
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (await file.length() > maxSize) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image size too large (max 5MB)'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+        setState(() => _selectedImage = file);
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to pick image: ${e.toString()}';
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -53,34 +70,30 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _uploadProgress = null;
     });
 
     try {
-      // First check if Firebase is initialized
-      if (!Firebase.apps.isNotEmpty) {
-        throw Exception('Firebase not initialized. Please restart the app.');
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
       }
 
-      // Create user with email and password
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-      )
-          .timeout(const Duration(seconds: 30));
+      );
 
-      // Upload image if selected
       String? imageUrl;
       if (_selectedImage != null) {
         final ref = FirebaseStorage.instance
             .ref()
-            .child('user_images')
-            .child('${credential.user!.uid}.jpg');
-        await ref.putFile(_selectedImage!);
-        imageUrl = await ref.getDownloadURL();
+            .child('user_images/${credential.user!.uid}.jpg');
+
+        final uploadTask = ref.putFile(_selectedImage!);
+        final snapshot = await uploadTask.whenComplete(() {});
+        imageUrl = await snapshot.ref.getDownloadURL();
       }
 
-      // Save user data to Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(credential.user!.uid)
@@ -93,23 +106,22 @@ class _RegisterPageState extends State<RegisterPage> {
       });
 
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration successful! Please login'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = _getFirebaseAuthErrorMessage(e);
-      });
-    } on FirebaseException catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Firebase error: ${e.message}';
-      });
+      setState(() => _errorMessage = _getFirebaseAuthErrorMessage(e));
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Registration error: ${e.toString()}';
-      });
+      setState(() => _errorMessage = 'Registration failed: ${e.toString()}');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -121,12 +133,10 @@ class _RegisterPageState extends State<RegisterPage> {
         return 'Email already registered';
       case 'invalid-email':
         return 'Invalid email address';
-      case 'operation-not-allowed':
-        return 'Email/password accounts are not enabled';
       case 'network-request-failed':
         return 'Network error. Check your connection';
       default:
-        return e.message ?? 'Registration failed. Please try again';
+        return e.message ?? 'Registration failed';
     }
   }
 
@@ -149,147 +159,148 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         title: const Text('Create Account'),
         centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Color(0xFFD43A2F)],
+            stops: [0.1, 0.9],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 20),
 
-                // Profile Image Picker
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: _selectedImage != null
-                        ? FileImage(_selectedImage!)
-                        : null,
-                    child: _selectedImage == null
-                        ? const Icon(
-                      Icons.camera_alt,
-                      size: 40,
-                      color: Color(0xFFD43A2F),
-                    )
-                        : null,
-                  ),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: _isLoading ? null : _pickImage,
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey[200],
+                        backgroundImage: _selectedImage != null
+                            ? FileImage(_selectedImage!)
+                            : null,
+                        child: _selectedImage == null
+                            ? const Icon(Icons.camera_alt,
+                            size: 40, color: Color(0xFFD43A2F))
+                            : null,
+                      ),
+                    ),
+                    if (_uploadProgress != null)
+                      CircularProgressIndicator(
+                        value: _uploadProgress,
+                        backgroundColor: Colors.white70,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFD43A2F)),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  'Add Profile Photo',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 16,
-                  ),
-                ),
+                Text('Add Profile Photo',
+                    style: TextStyle(color: Colors.grey[600])),
                 const SizedBox(height: 30),
 
-                // Full Name Field
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
                     labelText: 'Full Name',
                     prefixIcon: Icon(Icons.person, color: Color(0xFFD43A2F)),
+                    filled: true,
+                    fillColor: Colors.white70,
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your full name';
-                    }
-                    if (value.length < 3) {
-                      return 'Name must be at least 3 characters';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter your name';
+                    if (value.length < 3) return 'Name too short';
                     return null;
                   },
                 ),
                 const SizedBox(height: 20),
 
-                // Email Field
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email, color: Color(0xFFD43A2F)),
+                    filled: true,
+                    fillColor: Colors.white70,
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                      return 'Please enter a valid email';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter email';
+                    if (!value.contains('@')) return 'Invalid email';
                     return null;
                   },
                 ),
                 const SizedBox(height: 20),
 
-                // Password Field
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock, color: Color(0xFFD43A2F)),
+                    filled: true,
+                    fillColor: Colors.white70,
                     border: const OutlineInputBorder(),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility : Icons.visibility_off,
                         color: const Color(0xFFD43A2F),
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter password';
+                    if (value.length < 6) return 'Minimum 6 characters';
                     return null;
                   },
                 ),
                 const SizedBox(height: 20),
 
-                // Confirm Password Field
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
                   decoration: InputDecoration(
                     labelText: 'Confirm Password',
                     prefixIcon: const Icon(Icons.lock, color: Color(0xFFD43A2F)),
+                    filled: true,
+                    fillColor: Colors.white70,
                     border: const OutlineInputBorder(),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                        _obscureConfirmPassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                         color: const Color(0xFFD43A2F),
                       ),
-                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      onPressed: () => setState(() => _obscureConfirmPassword =
+                      !_obscureConfirmPassword),
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please confirm your password';
-                    }
                     if (value != _passwordController.text) {
-                      return 'Passwords do not match';
+                      return 'Passwords don\'t match';
                     }
                     return null;
                   },
                 ),
+
                 const SizedBox(height: 30),
 
-                // Error Message
                 if (_errorMessage != null)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -303,35 +314,56 @@ class _RegisterPageState extends State<RegisterPage> {
                       textAlign: TextAlign.center,
                     ),
                   ),
+
                 const SizedBox(height: 20),
 
-                // Register Button
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _registerUser,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD43A2F),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _registerUser,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD43A2F),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                        : const Text(
+                      'REGISTER',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 3,
+                ),
+
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Already have an account?"),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Login',
+                        style: TextStyle(fontSize: 18,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  )
-                      : const Text(
-                    'REGISTER',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  ],
                 ),
               ],
             ),
