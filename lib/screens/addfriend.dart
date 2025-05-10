@@ -17,6 +17,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
   bool _isUploading = false;
   bool _isChecking = false;
   String? _errorMessage;
+  bool _isExistingUser = false; // Track if the email belongs to an existing user
 
   @override
   void dispose() {
@@ -55,8 +56,18 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
 
   Future<bool> _checkFirestoreConnection() async {
     try {
-      // Try to access the friends collection
-      await FirebaseFirestore.instance.collection('friends').limit(1).get();
+      // Try to access the friends collection - this will be more likely to succeed
+      // since the current user should have permission to read their own friends
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        return false;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('friends')
+          .where('createdBy', isEqualTo: currentUser.uid)
+          .limit(1)
+          .get();
       return true;
     } catch (e) {
       debugPrint('Firestore connection test failed: ${e.toString()}');
@@ -107,31 +118,42 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     }
   }
 
+  // Modified to use Firebase Auth methods instead of direct Firestore query
   Future<bool> _checkIfUserExists() async {
     setState(() {
       _isChecking = true;
       _errorMessage = null;
+      _isExistingUser = false;
     });
 
     try {
       final String email = _emailController.text.trim();
 
-      // Query Firestore to check if a user with the given email exists
-      final QuerySnapshot result = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: email)
-          .get();
-
-      if (result.docs.isEmpty) {
-        _showError('No user found with this email address. Please check the email and try again.');
-        return false; // User doesn't exist
+      if (email.isEmpty || !email.contains('@')) {
+        _showError('Please enter a valid email address');
+        return false;
       }
 
-      return true; // User exists
+      // Query Firestore to check if a user with this email exists
+      final QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get(GetOptions(source: Source.server));
+
+      if (userSnapshot.docs.isNotEmpty) {
+        debugPrint('User found in Firestore: $email');
+        setState(() => _isExistingUser = true);
+        return true;
+      } else {
+        debugPrint('No user found with email: $email');
+        _showError('No user account found with this email.');
+        return false;
+      }
     } catch (e) {
       debugPrint('Error checking if user exists: ${e.toString()}');
-      _showError('Error checking user database: ${e.toString()}');
-      return false; // Assume user doesn't exist due to error
+      _showError('Error: ${e.toString()}');
+      return false;
     } finally {
       if (mounted) {
         setState(() => _isChecking = false);
@@ -139,6 +161,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     }
   }
 
+  // Modified function to add friend only if user exists
   Future<void> _addFriend() async {
     // Validate form inputs
     if (!_formKey.currentState!.validate()) return;
@@ -148,29 +171,28 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
       _errorMessage = null;
     });
 
-    // First check if we can connect to Firestore
+    // Check if Firestore connection works
     final firestoreConnected = await _checkFirestoreConnection();
     if (!firestoreConnected) {
-      _showError('Could not connect to database. Please check your internet connection.');
+      _showError('Could not connect to database. Check your internet connection.');
       return;
     }
 
-    // Check if friend already exists in your friend list
+    // Check if friend already exists
     final friendExists = await _checkIfFriendExists();
-    if (friendExists) {
-      // _showError is already called in _checkIfFriendExists
-      return;
-    }
+    if (friendExists) return;
 
-    // Check if the user exists in the app
-    final userExists = await _checkIfUserExists();
-    if (!userExists) {
-      // _showError is already called in _checkIfUserExists
-      return;
+    // Check if user exists in Firestore
+    if (!_isExistingUser) {
+      final userExists = await _checkIfUserExists();
+      if (!userExists) {
+        setState(() => _isUploading = false);
+        return; // Don't proceed if user doesn't exist
+      }
     }
 
     try {
-      // Get current user ID for reference
+      // Add friend logic remains the same
       final User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         _showError('You must be logged in to add a friend');
@@ -178,57 +200,25 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
       }
 
       final String userId = currentUser.uid;
-      debugPrint('Current user ID: $userId');
-      debugPrint('Adding friend with name: ${_nameController.text.trim()}');
 
-      // Get friend's user ID from users collection
-      final QuerySnapshot userSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: _emailController.text.trim())
-          .limit(1)
-          .get();
-
-      if (userSnapshot.docs.isEmpty) {
-        _showError('User not found. Please check the email and try again.');
-        return;
-      }
-
-      final String friendUserId = userSnapshot.docs.first.id;
-
-      // Add friend to Firestore
       final friendDocRef = await FirebaseFirestore.instance.collection('friends').add({
         'name': _nameController.text.trim(),
         'phoneNumber': _phoneController.text.trim(),
         'email': _emailController.text.trim(),
         'upcomingEvents': 0,
         'createdBy': userId,
-        'friendUserId': friendUserId,  // Store the friend's user ID
+        'friendUserId': '', // Leave blank for now
+        'isRegisteredUser': true, // Set to true
         'createdAt': FieldValue.serverTimestamp(),
         'lastUpdated': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('Friend document added with ID: ${friendDocRef.id}');
-
-      if (mounted) {
-        _showSuccess('Friend added successfully!');
-        Navigator.pop(context); // Return to previous screen
-      }
-    } on FirebaseAuthException catch (e) {
-      debugPrint('FirebaseAuthException: ${e.code} - ${e.message}');
-      _showError('Authentication error: ${e.message}');
-    } on FirebaseException catch (e) {
-      debugPrint('FirebaseException: ${e.code} - ${e.message}');
-
-      if (e.code == 'permission-denied') {
-        _showError('Permission denied. Check your database rules.');
-      } else if (e.code == 'unavailable') {
-        _showError('Firebase service unavailable. Check your internet connection.');
-      } else {
-        _showError('Firebase error: ${e.message}');
-      }
+      debugPrint('Friend added with ID: ${friendDocRef.id}');
+      _showSuccess('Friend added successfully!');
+      Navigator.pop(context); // Return to previous screen
     } catch (e) {
-      debugPrint('General error: ${e.toString()}');
-      _showError('Error: ${e.toString()}');
+      debugPrint('Error adding friend: ${e.toString()}');
+      _showError('Error adding friend: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isUploading = false);
@@ -285,6 +275,29 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                             child: Text(
                               _errorMessage!,
                               style: TextStyle(color: Colors.red[900]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  if (_isExistingUser)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green[700]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'User found with this email! You can add them as your friend.',
+                              style: TextStyle(color: Colors.green[900]),
                             ),
                           ),
                         ],
@@ -366,11 +379,30 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               prefixIcon: const Icon(Icons.email),
+                              suffixIcon: _emailController.text.isNotEmpty
+                                  ? IconButton(
+                                icon: Icon(
+                                  Icons.search,
+                                  color: _isChecking ? Colors.grey : Colors.blue,
+                                ),
+                                onPressed: _isChecking ? null : () {
+                                  if (_emailController.text.isNotEmpty && _emailController.text.contains('@')) {
+                                    _checkIfUserExists();
+                                  }
+                                },
+                              )
+                                  : null,
                               fillColor: Colors.white,
                               filled: true,
                             ),
                             keyboardType: TextInputType.emailAddress,
                             enabled: !_isUploading && !_isChecking,
+                            onChanged: (_) {
+                              // Reset the existing user flag when email changes
+                              if (_isExistingUser) {
+                                setState(() => _isExistingUser = false);
+                              }
+                            },
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Please enter an email address';
@@ -383,10 +415,43 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                             },
                           ),
 
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 10),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '* You can only add users who are registered in the app',
+                                  style: TextStyle(
+                                    color: Colors.grey[700],
+                                    fontStyle: FontStyle.italic,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.search),
+                                label: const Text('Check if user exists'),
+                                onPressed: (_isUploading || _isChecking)
+                                    ? null
+                                    : () {
+                                  if (_emailController.text.isNotEmpty &&
+                                      _emailController.text.contains('@')) {
+                                    _checkIfUserExists();
+                                  } else {
+                                    _showError('Please enter a valid email first');
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 20),
 
                           ElevatedButton.icon(
-                            onPressed: (_isUploading || _isChecking) ? null : _addFriend,
+                            onPressed: (_isUploading || _isChecking || !_isExistingUser)
+                                ? null
+                                : _addFriend,
                             icon: (_isUploading || _isChecking)
                                 ? const SizedBox(
                               width: 20,
@@ -398,12 +463,18 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                             )
                                 : const Icon(Icons.person_add),
                             label: Text(
-                              _isChecking ? 'Checking...' : (_isUploading ? 'Adding Friend...' : 'Add Friend'),
+                              _isChecking
+                                  ? 'Checking...'
+                                  : (_isUploading
+                                  ? 'Adding Friend...'
+                                  : (_isExistingUser
+                                  ? 'Add Friend'
+                                  : 'Verify User First')),
                               style: const TextStyle(fontSize: 16),
                             ),
                             style: ElevatedButton.styleFrom(
                               foregroundColor: Colors.white,
-                              backgroundColor: Colors.pink,
+                              backgroundColor: _isExistingUser ? Colors.pink : Colors.grey,
                               minimumSize: const Size(double.infinity, 50),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),

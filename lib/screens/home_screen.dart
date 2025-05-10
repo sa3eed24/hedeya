@@ -79,14 +79,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
+            const DrawerHeader(
+              decoration: BoxDecoration(
                 color: Colors.transparent,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
-                children: const [
+                children: [
                   Text(
                     'Gift Wish List',
                     style: TextStyle(
@@ -158,6 +158,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    final String? userId = currentUser?.uid;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -201,7 +204,13 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: const Icon(Icons.person_add),
         ),
         body: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('friends').snapshots(),
+          // Only show friends created by the current user
+          stream: userId != null
+              ? FirebaseFirestore.instance
+              .collection('friends')
+              .where('createdBy', isEqualTo: userId)
+              .snapshots()
+              : FirebaseFirestore.instance.collection('friends').snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator(color: Colors.white));
@@ -256,6 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             final friends = snapshot.data!.docs.map((doc) {
               final data = doc.data() as Map<String, dynamic>;
+              // Add the Firestore document ID to the data map
               data['id'] = doc.id;
               return Friend.fromMap(data);
             }).toList();
@@ -268,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: Dismissible(
-                    key: Key(friend.name), // Using id instead of name for key
+                    key: Key(friend.id ?? ''), // Use the document ID as the key
                     direction: DismissDirection.endToStart,
                     background: Container(
                       alignment: Alignment.centerRight,
@@ -310,7 +320,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                     onDismissed: (direction) {
-                      _deleteFriend(friend.name); // Passing id instead of name
+                      if (friend.id != null) {
+                        _deleteFriend(friend.id!); // Use the document ID for deletion
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Unable to delete: Friend ID is missing')),
+                        );
+                      }
                     },
                     child: Card(
                       elevation: 2,
