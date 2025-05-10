@@ -258,6 +258,35 @@ class _EventsScreenState extends State<EventsScreen> {
     );
   }
 
+  Future<void> _deleteEvent(String eventId, int index) async {
+    final deletedEvent = _events[index];
+    setState(() => _events.removeAt(index));
+
+    final scaffold = ScaffoldMessenger.of(context);
+    scaffold.showSnackBar(
+      SnackBar(
+        content: Text('Deleted ${deletedEvent.name}'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => setState(() => _events.insert(index, deletedEvent)),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    await Future.delayed(const Duration(seconds: 3));
+    if (mounted && !_events.contains(deletedEvent)) {
+      try {
+        await _firestoreService.deleteEvent(eventId);
+      } catch (e) {
+        scaffold.showSnackBar(
+          SnackBar(content: Text('Failed to delete event: ${e.toString()}')),
+        );
+        if (mounted) setState(() => _events.insert(index, deletedEvent));
+      }
+    }
+  }
+
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
       child: Container(
@@ -374,95 +403,130 @@ class _EventsScreenState extends State<EventsScreen> {
             itemCount: _events.length,
             itemBuilder: (context, index) {
               final event = _events[index];
-              return Card(
-                elevation: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              return Dismissible(
+                key: Key(event.id ?? '${event.name}_$index'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  color: Colors.red,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
                 ),
-                child: InkWell(
-                  onTap: () => _openEventGifts(event),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            _getCategoryIcon(event.category),
-                            size: 30,
-                            color: Colors.red,
-                          ),
+                confirmDismiss: (direction) async {
+                  return await showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Event'),
+                      content: Text(
+                          'Are you sure you want to delete ${event.name}?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(context).pop(false),
+                          child: const Text('Cancel'),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                event.name,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Category: ${event.category}',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: event.status == 'active'
-                                          ? Colors.green.withOpacity(0.2)
-                                          : Colors.grey.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      event.status.toUpperCase(),
-                                      style: TextStyle(
-                                        color: event.status == 'active'
-                                            ? Colors.green[700]
-                                            : Colors.grey[700],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${event.gifts.length} Gifts',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.arrow_forward_ios,
-                          size: 16,
-                          color: Colors.grey,
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(context).pop(true),
+                          child: const Text('Delete',
+                              style: TextStyle(color: Colors.red)),
                         ),
                       ],
+                    ),
+                  );
+                },
+                onDismissed: (direction) =>
+                    _deleteEvent(event.id!, index),
+                child: Card(
+                  elevation: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: InkWell(
+                    onTap: () => _openEventGifts(event),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _getCategoryIcon(event.category),
+                              size: 30,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  event.name,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Category: ${event.category}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: event.status == 'active'
+                                            ? Colors.green.withOpacity(0.2)
+                                            : Colors.grey.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        event.status.toUpperCase(),
+                                        style: TextStyle(
+                                          color: event.status == 'active'
+                                              ? Colors.green[700]
+                                              : Colors.grey[700],
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${event.gifts.length} Gifts',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

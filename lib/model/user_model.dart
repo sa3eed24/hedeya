@@ -3,6 +3,8 @@ class UserModel {
   final String Email;
   final String password;
   final String image;
+  final List<String> friends = [];
+  final List<String> events = [];
 
   UserModel({
     required this.Name,

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../model/gift_model.dart';
-import '../model/event_model.dart';
-import '../utils/giftcard.dart';
 import '../screens/addgift.dart';
 import '../screens/pledgedgifts.dart';
 import '../services/giftcardcontrol.dart';
+import '../utils/giftcard.dart';
 
 class GiftList extends StatefulWidget {
   final String eventId;
@@ -33,75 +32,60 @@ class _GiftListState extends State<GiftList> {
   }
 
   Future<void> _loadEventGifts() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final gifts = await _giftController.getEventGifts(widget.eventId);
-      setState(() {
-        _gifts = gifts;
-        _isLoading = false;
-      });
+      setState(() => _gifts = gifts);
     } catch (e) {
-      print('Error loading gifts: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading gifts: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _onGiftStatusChanged(String giftId, int index, bool status) async {
-    // Update locally first for responsive UI
-    setState(() {
-      _gifts[index] = GiftModel(
-        id: _gifts[index].id,
-        name: _gifts[index].name,
-        description: _gifts[index].description,
-        price: _gifts[index].price,
-        imageUrl: _gifts[index].imageUrl,
-        status: status,
-        pledgedUser: status ? 'Current User' : '',
-        eventId: _gifts[index].eventId,
-      );
-    });
+  Future<void> _onGiftStatusChanged(String giftId, int index, bool status) async {
+    final previousState = _gifts[index];
+    try {
+      setState(() {
+        _gifts[index] = _gifts[index].copyWith(
+          status: status,
+          pledgedUser: status ? 'Current User' : null,
+        );
+      });
 
-    // Then update in Firebase
-    await _giftController.updateGiftStatus(
-        giftId,
-        status,
-        status ? 'Current User' : ''
-    );
+      await _giftController.updateGiftStatus(
+        giftId: giftId,
+        status: status,
+        pledgedUser: status ? 'Current User' : null,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update gift: ${e.toString()}')),
+        );
+        setState(() => _gifts[index] = previousState);
+      }
+    }
   }
 
-  void _deleteGift(String giftId, int index) async {
-    final deletedGift = _gifts[index];
-
-    // Remove locally first
-    setState(() {
-      _gifts.removeAt(index);
-    });
-
-    // Show undo snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Deleted ${deletedGift.name}'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            setState(() {
-              _gifts.insert(index, deletedGift);
-            });
-          },
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-
-    // After snackbar duration, if not undone, delete from Firebase
-    await Future.delayed(const Duration(seconds: 3, milliseconds: 300));
-    if (!_gifts.contains(deletedGift)) {
+  Future<void> _deleteGift(String giftId) async {
+    try {
       await _giftController.deleteGift(giftId);
+      setState(() {
+        // Remove the gift from the local list
+        _gifts.removeWhere(((gift) => gift.id == giftId));
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gift deleted successfully!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete gift: $e')),
+      );
     }
   }
 
@@ -192,103 +176,92 @@ class _GiftListState extends State<GiftList> {
         ),
         child: SafeArea(
           child: _isLoading
-              ? const Center(
-            child: CircularProgressIndicator(),
-          )
-              : Column(
-            children: [
-              Expanded(
-                child: _gifts.isEmpty
-                    ? Center(
-                  child: Text(
-                    'No gifts added to this event yet\nTap the + button to add one',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                )
-                    : RefreshIndicator(
-                  onRefresh: _loadEventGifts,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 8.0),
-                    itemCount: _gifts.length,
-                    itemBuilder: (context, index) {
-                      final gift = _gifts[index];
-                      return Dismissible(
-                        key: Key(gift.id ?? '${gift.name}_$index'),
-                        direction: gift.status
-                            ? DismissDirection.none
-                            : DismissDirection.endToStart,
-                        background: Container(
-                          color: Colors.red,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          child: const Icon(Icons.delete, color: Colors.white),
-                        ),
-                        confirmDismiss: (direction) async {
-                          if (gift.status) return false;
-                          return await showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Delete Gift'),
-                              content: Text(
-                                  'Are you sure you want to delete ${gift.name}?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(true),
-                                  child: const Text('Delete',
-                                      style: TextStyle(color: Colors.red)),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        onDismissed: (direction) =>
-                            _deleteGift(gift.id ?? 'temp_$index', index),
-                        child: GiftCard(
-                          gift: gift,
-                          onStatusChanged: (status) =>
-                              _onGiftStatusChanged(gift.id ?? 'temp_$index', index, status),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+              ? const Center(child: CircularProgressIndicator())
+              : _gifts.isEmpty
+              ? Center(
+            child: Text(
+              'No gifts added to this event yet\nTap the + button to add one',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[700],
               ),
-            ],
+            ),
+          )
+              : RefreshIndicator(
+            onRefresh: _loadEventGifts,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0, vertical: 8.0),
+              itemCount: _gifts.length,
+              itemBuilder: (context, index) {
+                final gift = _gifts[index];
+                return Dismissible(
+                  key: Key(gift.id ?? '${gift.name}_$index'),
+                  direction: gift.status
+                      ? DismissDirection.none
+                      : DismissDirection.endToStart,
+                  background: Container(
+                    color: Colors.red,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  confirmDismiss: (direction) async {
+                    if (gift.status) return false;
+                    return await showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Gift'),
+                        content: Text(
+                            'Are you sure you want to delete ${gift.name}?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(true),
+                            child: const Text('Delete',
+                                style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  onDismissed: (direction) =>
+                      _deleteGift(gift.id!),
+                  child: GiftCard(
+                    gift: gift,
+                    onStatusChanged: (status) =>
+                        _onGiftStatusChanged(gift.id!, index, status),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
           if (index == 1) {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => PledgedGifts(
-                  gifts: _gifts,
                   eventId: widget.eventId,
                   eventName: widget.eventName,
                 ),
               ),
             ).then((_) {
-              setState(() {
-                _currentIndex = 0;
-              });
-              _loadEventGifts(); // Refresh gifts when returning from pledged gifts screen
+              if (mounted) {
+                setState(() => _currentIndex = 0);
+                _loadEventGifts();
+              }
             });
           }
         },
@@ -316,22 +289,23 @@ class _GiftListState extends State<GiftList> {
           );
 
           if (newGift != null && mounted) {
-            final success = await _giftController.addGift(newGift);
-
-            if (success) {
-              _loadEventGifts(); // Refresh the list
+            try {
+              await _giftController.addGift(newGift);
+              _loadEventGifts();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${newGift.name} added successfully!')),
+                SnackBar(
+                    content: Text('${newGift.name} added successfully!')),
               );
-            } else {
+            } catch (e) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Failed to add gift. Please try again.')),
-              );
-            }
-          }
+                  SnackBar(
+                      content: Text('Failed to add gift: ${e.toString()}')),
+          );
+        }
+        }
         },
-        child: const Icon(Icons.add, color: Colors.red),
-        backgroundColor: Colors.white,
+        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: Colors.redAccent,
       )
           : null,
     );

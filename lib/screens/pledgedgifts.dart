@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import '../model/gift_model.dart';
-import '../utils/giftcard.dart';
 import '../services/giftcardcontrol.dart';
+import '../utils/giftcard.dart';
 
 class PledgedGifts extends StatefulWidget {
-  final List<GiftModel> gifts;
   final String eventId;
   final String eventName;
 
   const PledgedGifts({
     super.key,
-    required this.gifts,
     required this.eventId,
     required this.eventName,
   });
@@ -32,10 +30,7 @@ class _PledgedGiftsState extends State<PledgedGifts> {
   }
 
   Future<void> _loadPledgedGifts() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final allGifts = await _giftController.getEventGifts(widget.eventId);
       setState(() {
@@ -43,11 +38,29 @@ class _PledgedGiftsState extends State<PledgedGifts> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading pledged gifts: $e');
-      setState(() {
-        _pledgedGifts = widget.gifts.where((gift) => gift.status).toList();
-        _isLoading = false;
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading gifts: ${e.toString()}')),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _unpledgeGift(String giftId) async {
+    try {
+      await _giftController.updateGiftStatus(
+        giftId: giftId,
+        status: false,
+        pledgedUser: null,
+      );
+      await _loadPledgedGifts();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to unpledge gift: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -126,7 +139,7 @@ class _PledgedGiftsState extends State<PledgedGifts> {
     return Scaffold(
       drawer: _buildDrawer(context),
       appBar: AppBar(
-        title: Text('${widget.eventName} - Pledged Gifts'),
+        title: Text('${widget.eventName}  - Pledged Gifts'),
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -138,48 +151,29 @@ class _PledgedGiftsState extends State<PledgedGifts> {
         ),
         child: SafeArea(
           child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _pledgedGifts.isEmpty
               ? const Center(
-            child: CircularProgressIndicator(),
+            child: Text(
+              'No pledged gifts yet for this event',
+              style: TextStyle(fontSize: 18),
+            ),
           )
-              : Column(
-            children: [
-              Expanded(
-                child: _pledgedGifts.isEmpty
-                    ? const Center(
-                  child: Text(
-                    'No pledged gifts yet for this event',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                )
-                    : RefreshIndicator(
-                  onRefresh: _loadPledgedGifts,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16.0),
-                    itemCount: _pledgedGifts.length,
-                    itemBuilder: (context, index) {
-                      final gift = _pledgedGifts[index];
-                      return GiftCard(
-                        gift: gift,
-                        onStatusChanged: (status) async {
-                          if (!status) {
-                            try {
-                              await _giftController.updateGiftStatus(
-                                  gift.id!,
-                                  false,
-                                  ''
-                              );
-                              _loadPledgedGifts();
-                            } catch (e) {
-                              print('Error unpledging gift: $e');
-                            }
-                          }
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
+              : RefreshIndicator(
+            onRefresh: _loadPledgedGifts,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: _pledgedGifts.length,
+              itemBuilder: (context, index) {
+                final gift = _pledgedGifts[index];
+                return GiftCard(
+                  gift: gift,
+                  onStatusChanged: (status) {
+                    if (!status) _unpledgeGift(gift.id!);
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -187,10 +181,7 @@ class _PledgedGiftsState extends State<PledgedGifts> {
         currentIndex: _currentIndex,
         onTap: (index) {
           if (index == _currentIndex) return;
-
-          if (index == 0) {
-            Navigator.pop(context);
-          }
+          if (index == 0) Navigator.pop(context);
         },
         items: const [
           BottomNavigationBarItem(
@@ -202,7 +193,7 @@ class _PledgedGiftsState extends State<PledgedGifts> {
             label: 'Pledged Gifts',
           ),
         ],
-        selectedItemColor: Colors.purple,
+        selectedItemColor: Colors.deepPurple,
         unselectedItemColor: Colors.grey,
       ),
     );

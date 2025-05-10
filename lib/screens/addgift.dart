@@ -4,6 +4,7 @@ import 'package:barcode_scan2/barcode_scan2.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart'; // Add Firebase Auth import
 import '../model/gift_model.dart';
 
 class AddGift extends StatefulWidget {
@@ -221,6 +222,13 @@ class _AddGiftState extends State<AddGift> {
           return;
         }
 
+        // Get the current authenticated user's ID
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          _showErrorSnackBar('User not authenticated');
+          return;
+        }
+
         final newGift = GiftModel(
           name: _nameController.text.trim(),
           description: _descriptionController.text.trim(),
@@ -229,6 +237,7 @@ class _AddGiftState extends State<AddGift> {
           status: false,
           pledgedUser: '',
           eventId: widget.eventId,
+          userId: user.uid, // Add the authenticated user's ID
         );
 
         Navigator.pop(context, newGift);

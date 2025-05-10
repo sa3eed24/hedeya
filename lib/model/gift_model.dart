@@ -1,5 +1,5 @@
 class GiftModel {
-  final String? id;
+  String? id;
   final String name;
   final String description;
   final double price;
@@ -7,6 +7,7 @@ class GiftModel {
   final bool status;
   final String pledgedUser;
   final String eventId;
+  final String userId; // Added userId field
 
   GiftModel({
     this.id,
@@ -17,6 +18,7 @@ class GiftModel {
     required this.status,
     required this.pledgedUser,
     required this.eventId,
+    required this.userId,
   });
 
   factory GiftModel.fromJson(Map<String, dynamic> json, {String? id}) {
@@ -31,11 +33,13 @@ class GiftModel {
       status: json['status'] ?? false,
       pledgedUser: json['pledgedUser'] ?? '',
       eventId: json['eventId'] ?? '',
+      userId: json['userId'] ?? '', // Added userId field
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'name': name,
       'description': description,
       'price': price,
@@ -43,6 +47,31 @@ class GiftModel {
       'status': status,
       'pledgedUser': pledgedUser,
       'eventId': eventId,
+      'userId': userId, // Added userId field
     };
+  }
+
+  GiftModel copyWith({
+    String? id,
+    String? name,
+    String? description,
+    double? price,
+    String? imageUrl,
+    bool? status,
+    String? pledgedUser,
+    String? eventId,
+    String? userId,
+  }) {
+    return GiftModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      imageUrl: imageUrl ?? this.imageUrl,
+      status: status ?? this.status,
+      pledgedUser: pledgedUser ?? this.pledgedUser,
+      eventId: eventId ?? this.eventId,
+      userId: userId ?? this.userId, // Added userId field
+    );
   }
 }

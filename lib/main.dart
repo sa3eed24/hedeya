@@ -54,7 +54,6 @@ class MyApp extends StatelessWidget {
           eventId: '',
         ),
         '/pledgedgifts': (context) => PledgedGifts(
-          gifts: [],
           eventId: '',
           eventName: '',
         ),

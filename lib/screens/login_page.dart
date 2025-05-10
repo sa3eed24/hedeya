@@ -30,8 +30,10 @@ class _LoginPageState extends State<LoginPage> {
       // Set persistence once (LOCAL is default, but explicitly enforced)
       await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
 
-      // Auto-login if user is already persisted
-      if (FirebaseAuth.instance.currentUser != null && mounted) {
+      // Check if a user is already signed in
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && mounted) {
+        // User is already signed in, navigate to home screen
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
