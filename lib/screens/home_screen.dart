@@ -160,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           title: const Text(
-            'My Gift Wish List',
+            'Friends',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
