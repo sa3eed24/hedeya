@@ -50,10 +50,10 @@ class MyApp extends StatelessWidget {
           eventId: '',
           eventName: '',
         ),
-        '/addgift': (context) => AddGift(
+        '/addgift': (context) => const AddGift(
           eventId: '',
         ),
-        '/pledgedgifts': (context) => PledgedGifts(
+        '/pledgedgifts': (context) => const PledgedGifts(
           eventId: '',
           eventName: '',
         ),
