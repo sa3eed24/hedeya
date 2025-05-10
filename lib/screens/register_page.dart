@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import '../model/user_model.dart';
 import 'dart:typed_data';
+
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -83,32 +85,40 @@ class _RegisterPageState extends State<RegisterPage> {
         password: _passwordController.text.trim(),
       );
 
-      String? base64Image;
-
+      String? base64Image = '';
       if (_selectedImage != null) {
         final bytes = await _selectedImage!.readAsBytes();
         base64Image = base64Encode(bytes);
       }
 
+      // Create UserModel instance
+      final userModel = UserModel(
+        Name: _nameController.text.trim(),
+        Email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        image: base64Image ?? '',
+      );
+
+      // Save user data to Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(credential.user!.uid)
           .set({
-        'name': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'profileImage': base64Image,
+        ...userModel.toJson(),
         'createdAt': FieldValue.serverTimestamp(),
         'uid': credential.user!.uid,
       });
 
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        // Show success message on the LoginPage
+        ScaffoldMessenger.of(Navigator.of(context).context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful!'),
+            content: Text('Registration successful! Please log in.'),
             backgroundColor: Colors.green,
           ),
         );
+        // Navigate to LoginPage, replacing RegisterPage
+        Navigator.pushReplacementNamed(context, '/login');
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _getFirebaseAuthErrorMessage(e));
