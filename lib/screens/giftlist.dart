@@ -73,19 +73,31 @@ class _GiftListState extends State<GiftList> {
   }
 
   Future<void> _deleteGift(String giftId) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Deleting gift...'), duration: Duration(seconds: 1)),
+    );
+
     try {
+      debugPrint('[DEBUG] Deleting gift with ID: $giftId');
       await _giftController.deleteGift(giftId);
+
       setState(() {
-        // Remove the gift from the local list
-        _gifts.removeWhere(((gift) => gift.id == giftId));
+        _gifts.removeWhere((gift) => gift.id == giftId);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gift deleted successfully!')),
-      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gift deleted successfully!')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete gift: $e')),
-      );
+      debugPrint('[DEBUG] Error in GiftList._deleteGift: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete gift: $e')),
+        );
+        _loadEventGifts();
+      }
     }
   }
 
@@ -197,7 +209,7 @@ class _GiftListState extends State<GiftList> {
               itemBuilder: (context, index) {
                 final gift = _gifts[index];
                 return Dismissible(
-                  key: Key(gift.id ?? '${gift.name}_$index'),
+                  key: Key(gift.id!),
                   direction: gift.status
                       ? DismissDirection.none
                       : DismissDirection.endToStart,
@@ -214,7 +226,7 @@ class _GiftListState extends State<GiftList> {
                       builder: (context) => AlertDialog(
                         title: const Text('Delete Gift'),
                         content: Text(
-                            'Are you sure you want to delete ${gift.name}?'),
+                            'Are you sure you want to delete ${gift.name}?\n\nGift ID: ${gift.id}'),
                         actions: [
                           TextButton(
                             onPressed: () =>
@@ -231,8 +243,7 @@ class _GiftListState extends State<GiftList> {
                       ),
                     );
                   },
-                  onDismissed: (direction) =>
-                      _deleteGift(gift.id!),
+                  onDismissed: (direction) => _deleteGift(gift.id!),
                   child: GiftCard(
                     gift: gift,
                     onStatusChanged: (status) =>
@@ -298,11 +309,11 @@ class _GiftListState extends State<GiftList> {
               );
             } catch (e) {
               ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Failed to add gift: ${e.toString()}')),
-          );
-        }
-        }
+                SnackBar(
+                    content: Text('Failed to add gift: ${e.toString()}')),
+              );
+            }
+          }
         },
         child: const Icon(Icons.add, color: Colors.white),
         backgroundColor: Colors.redAccent,

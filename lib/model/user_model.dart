@@ -1,10 +1,13 @@
+import '../model/event_model.dart';
+import '../model/Friend_model.dart';
+
 class UserModel {
   final String Name;
   final String Email;
   final String password;
   final String image;
-  final List<String> friends = [];
-  final List<String> events = [];
+  final List<Friend> friend = [];
+  final List<EventModel> events = [];
 
   UserModel({
     required this.Name,

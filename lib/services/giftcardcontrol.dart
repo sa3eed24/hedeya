@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../model/event_model.dart';
 import '../model/gift_model.dart';
@@ -8,7 +9,6 @@ class GiftCardControl {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
-  // Dependency injection for easier testing
   GiftCardControl({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
@@ -20,64 +20,49 @@ class GiftCardControl {
   CollectionReference get eventsRef => _firestore.collection('events');
   CollectionReference get giftsRef => _firestore.collection('gifts');
 
-  // Fetch gifts for a specific event
   Future<List<GiftModel>> getEventGifts(String eventId) async {
     try {
       if (eventId.isEmpty) throw ArgumentError('eventId cannot be empty');
 
+      debugPrint('[DEBUG] Fetching gifts for event: $eventId');
       final QuerySnapshot snapshot = await giftsRef
           .where('eventId', isEqualTo: eventId)
-          .limit(100) // Add limit to prevent loading too much data
+          .limit(100)
           .get();
+
+      debugPrint('[DEBUG] Found ${snapshot.docs.length} gifts');
 
       return snapshot.docs.map((doc) {
         return GiftModel.fromJson(doc.data() as Map<String, dynamic>, id: doc.id);
       }).toList();
     } catch (e) {
-      print('Error fetching event gifts: $e');
-      rethrow; // Or return a Failure object
-    }
-  }
-
-  // Fetch a specific event by ID
-  Future<EventModel?> getEvent(String eventId) async {
-    try {
-      if (eventId.isEmpty) throw ArgumentError('eventId cannot be empty');
-
-      final DocumentSnapshot snapshot = await eventsRef.doc(eventId).get();
-      return snapshot.exists
-          ? EventModel.fromJson(snapshot.data() as Map<String, dynamic>, id: snapshot.id)
-          : null;
-    } catch (e) {
-      print('Error fetching event: $e');
+      debugPrint('Error fetching event gifts: $e');
       rethrow;
     }
   }
 
-  // Add a new gift to the database
-  Future<void> addGift(GiftModel gift) async {
+  Future<String> addGift(GiftModel gift) async {
     try {
-      // Validate required fields
       if (gift.name.isEmpty || gift.eventId.isEmpty) {
         throw ArgumentError('Gift name and eventId cannot be empty');
       }
 
-      // Generate a unique ID if not provided
-      if (gift.id == null || gift.id!.isEmpty) {
-        gift.id = generateUniqueId();
-      }
+      final DocumentReference docRef = giftsRef.doc();
+      final String giftId = docRef.id;
 
-      // Use the gift.id as the Firestore document ID
-      await giftsRef.doc(gift.id).set(gift.toJson());
-      print('Gift added successfully with ID: ${gift.id}');
+      final giftData = gift.copyWith(id: giftId).toJson();
+
+      await docRef.set(giftData);
+
+      debugPrint('[DEBUG] Gift saved successfully with Firestore ID: $giftId');
+      return giftId;
     } catch (e, stackTrace) {
-      print('Error adding gift: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error adding gift: $e');
+      debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
   }
 
-  // Update the status of a gift
   Future<void> updateGiftStatus({
     required String giftId,
     required bool status,
@@ -86,38 +71,38 @@ class GiftCardControl {
     try {
       if (giftId.isEmpty) throw ArgumentError('giftId cannot be empty');
 
+      debugPrint('[DEBUG] Updating gift status: $giftId to $status');
+
       final updateData = <String, dynamic>{
         'status': status,
         if (pledgedUser != null) 'pledgedUser': pledgedUser,
       };
 
       await giftsRef.doc(giftId).update(updateData);
+      debugPrint('[DEBUG] Gift status updated successfully');
     } catch (e) {
-      print('Error updating gift status: $e');
+      debugPrint('Error updating gift status: $e');
       rethrow;
     }
   }
 
-  // Delete a gift from the database
   Future<void> deleteGift(String giftId) async {
     try {
       if (giftId.isEmpty) throw ArgumentError('giftId cannot be empty');
 
-      print('Attempting to delete gift with ID: $giftId'); // Add better logging
+      debugPrint('[DEBUG] Deleting gift with Firestore ID: $giftId');
       await giftsRef.doc(giftId).delete();
-      print('Gift with ID $giftId deleted successfully');
+      debugPrint('[DEBUG] Gift deleted successfully with ID: $giftId');
     } catch (e) {
-      print('Error deleting gift with ID $giftId: $e');
+      debugPrint('Error deleting gift with ID $giftId: $e');
       rethrow;
     }
   }
 
-  // Generate a unique ID
   String generateUniqueId() {
-    return Uuid().v4(); // Using uuid package to generate a version 4 UUID
+    return Uuid().v4();
   }
 
-  // Fetch events owned by the current user
   Future<List<EventModel>> getUserEvents() async {
     try {
       final userId = currentUserId;
@@ -125,14 +110,14 @@ class GiftCardControl {
 
       final QuerySnapshot snapshot = await eventsRef
           .where('owner', isEqualTo: userId)
-          .limit(100) // Add limit
+          .limit(100)
           .get();
 
       return snapshot.docs.map((doc) {
         return EventModel.fromJson(doc.data() as Map<String, dynamic>, id: doc.id);
       }).toList();
     } catch (e) {
-      print('Error fetching user events: $e');
+      debugPrint('Error fetching user events: $e');
       rethrow;
     }
   }
