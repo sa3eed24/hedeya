@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,7 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _obscurePassword = true;
-  bool _rememberMe = true;
+  bool _rememberMe = false;
 
   @override
   void initState() {
@@ -24,21 +25,24 @@ class _LoginPageState extends State<LoginPage> {
     _initializeFirebase();
   }
 
+  // Initialize Firebase and check if the user is logged in
   Future<void> _initializeFirebase() async {
     try {
       await Firebase.initializeApp();
-      // Set persistence once (LOCAL is default, but explicitly enforced)
-      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
-
-      // Auto-login if user is already persisted
-      if (FirebaseAuth.instance.currentUser != null && mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
+      _checkCurrentUser();
     } catch (e) {
       if (mounted) {
         setState(() => _errorMessage = 'Failed to initialize app');
       }
       debugPrint('Firebase init error: $e');
+    }
+  }
+
+  // Check if the user is already signed in
+  Future<void> _checkCurrentUser() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
@@ -56,8 +60,27 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text.trim(),
       );
 
-      if (userCredential.user != null && mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+      if (userCredential.user != null) {
+        // If "Keep me signed in" is checked, the session is automatically persisted
+        if (_rememberMe) {
+          await FirebaseAuth.instance.setPersistence(Persistence.LOCAL); // Firebase persistence will keep the user signed in
+        } else {
+          await FirebaseAuth.instance.setPersistence(Persistence.SESSION); // Firebase session-based persistence
+        }
+
+        // Check if the user exists in Firestore
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).get();
+
+        if (userDoc.exists) {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = 'User does not exist in Firestore';
+            });
+          }
+        }
       }
     } on FirebaseAuthException catch (e) {
       String errorMessage;
@@ -252,10 +275,9 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     )
                         : const Text(
-                      'LOGIN',
+                      'Login',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
