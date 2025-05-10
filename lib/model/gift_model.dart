@@ -29,7 +29,7 @@ class GiftModel {
       price: json['price'] is int
           ? (json['price'] as int).toDouble()
           : (json['price'] ?? 0.0),
-      image: json['imageUrl'],
+      image: json['image'],
       status: json['status'] ?? false,
       pledgedUser: json['pledgedUser'] ?? '',
       eventId: json['eventId'] ?? '',
@@ -43,7 +43,7 @@ class GiftModel {
       'name': name,
       'description': description,
       'price': price,
-      'imageUrl': image,
+      'image': image,
       'status': status,
       'pledgedUser': pledgedUser,
       'eventId': eventId,
