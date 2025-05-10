@@ -1,10 +1,13 @@
+import '../model/event_model.dart';
+
 class Friend {
   final String name;
   final String phoneNumber;
   final String email;
   final int upcomingEvents;
   final String? profilePictureUrl; // Optional now, for backward compatibility
-  final String? id; // Added Firestore document ID
+  final String? id;
+  final List<EventModel> events = [];// Added Firestore document ID
 
   Friend({
     required this.name,
