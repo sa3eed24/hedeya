@@ -1,5 +1,5 @@
-import '../model/event_model.dart';
-import '../model/Friend_model.dart';
+import 'Friend_model.dart';
+import 'event_model.dart';
 
 class UserModel {
   final String Name;

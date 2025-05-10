@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../model/user_model.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -40,8 +39,7 @@ class _LoginPageState extends State<LoginPage> {
               .get();
 
           if (userDoc.exists && mounted) {
-            final userModel = UserModel.fromJson(userDoc.data()!);
-            Navigator.pushReplacementNamed(context, '/home', arguments: userModel);
+            Navigator.pushReplacementNamed(context, '/home');
           }
         }
       });
@@ -75,9 +73,8 @@ class _LoginPageState extends State<LoginPage> {
             .get();
 
         if (userDoc.exists) {
-          final userModel = UserModel.fromJson(userDoc.data()!);
           if (mounted) {
-            Navigator.pushReplacementNamed(context, '/home', arguments: userModel);
+            Navigator.pushReplacementNamed(context, '/home');
           }
         } else {
           // User doesn't exist in Firestore - sign them out
