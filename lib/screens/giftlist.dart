@@ -68,64 +68,81 @@ class _GiftListState extends State<GiftList> {
 
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(
-              color: Colors.pink,
-            ),
-            child: Text(
-              'Gift Wish List',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.pink, Colors.red],
+          ),
+        ),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                color: Colors.transparent,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: const [
+                  Text(
+                    'Gift Wish List',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.person),
-            title: const Text('Profile'),
-            onTap: () => Navigator.pushNamed(context, '/profile'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.home),
-            title: const Text('Home'),
-            onTap: () => Navigator.pushNamed(context, '/home'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.list),
-            title: const Text('My Wishlist'),
-            onTap: () => Navigator.pushNamed(context, '/giftlist'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.group),
-            title: const Text('Friends'),
-            onTap: () => Navigator.pushNamed(context, '/friends'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.add),
-            title: const Text('Add Gift'),
-            onTap: () async {
-              Navigator.pop(context); // Close the drawer first
-              final newGift = await Navigator.push<gift_model>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddGift(),
-                ),
-              );
-
-              if (newGift != null && mounted) {
-                setState(() {
-                  _gifts.add(newGift);
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${newGift.name} added successfully!')),
+            ListTile(
+              leading: const Icon(Icons.person, color: Colors.white),
+              title: const Text('Profile', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/profile');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person, color: Colors.white),
+              title: const Text('Home', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/home');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.list, color: Colors.white),
+              title: const Text('My Wishlist', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/giftlist');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group, color: Colors.white),
+              title: const Text('Friends', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/friends');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add, color: Colors.white),
+              title: const Text('Add Gift', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GiftList()),
                 );
-              }
-            },
-          ),
-        ],
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
