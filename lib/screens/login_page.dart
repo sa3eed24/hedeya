@@ -17,7 +17,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _obscurePassword = true;
-  bool _rememberMe = false;
 
   @override
   void initState() {
@@ -29,20 +28,26 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _initializeFirebase() async {
     try {
       await Firebase.initializeApp();
-      _checkCurrentUser();
+
+      // Check auth state
+      FirebaseAuth.instance.authStateChanges().listen((User? user) async {
+        if (user != null) {
+          // Verify user exists in Firestore before navigating
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+          if (userDoc.exists && mounted) {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+        }
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _errorMessage = 'Failed to initialize app');
       }
       debugPrint('Firebase init error: $e');
-    }
-  }
-
-  // Check if the user is already signed in
-  Future<void> _checkCurrentUser() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
@@ -61,23 +66,23 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (userCredential.user != null) {
-        // If "Keep me signed in" is checked, the session is automatically persisted
-        if (_rememberMe) {
-          await FirebaseAuth.instance.setPersistence(Persistence.LOCAL); // Firebase persistence will keep the user signed in
-        } else {
-          await FirebaseAuth.instance.setPersistence(Persistence.SESSION); // Firebase session-based persistence
-        }
-
         // Check if the user exists in Firestore
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).get();
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .get();
 
         if (userDoc.exists) {
-          Navigator.pushReplacementNamed(context, '/home');
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
         } else {
+          // User doesn't exist in Firestore - sign them out
+          await FirebaseAuth.instance.signOut();
           if (mounted) {
             setState(() {
               _isLoading = false;
-              _errorMessage = 'User does not exist in Firestore';
+              _errorMessage = 'User account not properly set up';
             });
           }
         }
@@ -109,6 +114,7 @@ class _LoginPageState extends State<LoginPage> {
           _errorMessage = errorMessage;
         });
       }
+      debugPrint('FirebaseAuthException: $e');
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -117,6 +123,21 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
       debugPrint('Login error: $e');
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    if (_emailController.text.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email to reset password');
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text.trim());
+      setState(() => _errorMessage = 'Password reset email sent. Please check your inbox.');
+    } catch (e) {
+      setState(() => _errorMessage = 'Failed to send password reset email. Please try again.');
+      debugPrint('Password reset error: $e');
     }
   }
 
@@ -226,18 +247,15 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _rememberMe,
-                      onChanged: (value) => setState(() => _rememberMe = value!),
-                      activeColor: const Color(0xFFD43A2F),
+                TextButton(
+                  onPressed: _resetPassword,
+                  child: const Text(
+                    'Forgot Password?',
+                    style: TextStyle(
+                      color: Color(0xFFD43A2F),
+                      fontWeight: FontWeight.bold,
                     ),
-                    const Text(
-                      'Keep me signed in',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 20),
                 if (_errorMessage != null)
